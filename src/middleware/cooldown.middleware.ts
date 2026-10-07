@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 import { checkCooldown } from '../services/cooldown.service';
+import { isUpdateWindowOpen } from '../services/updateWindow.service';
 
 export const checkFieldCooldown = (fieldName: string) => {
   return async (
@@ -10,6 +11,12 @@ export const checkFieldCooldown = (fieldName: string) => {
   ): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ success: false, message: 'Not authenticated' });
+      return;
+    }
+
+    const windowOpen = await isUpdateWindowOpen();
+    if (windowOpen) {
+      next();
       return;
     }
 

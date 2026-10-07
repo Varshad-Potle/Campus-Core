@@ -4,8 +4,12 @@ import { Permissions } from '../utils/bitmask';
 import {
   applyBulkCooldown,
   clearBulkCooldown,
+  closeWindow,
+  openWindow,
   setUserPermissions,
+  windowStatus,
 } from '../controllers/admin.controller';
+
 
 const router = Router();
 
@@ -28,6 +32,27 @@ router.post(
   authenticate,
   requirePermission(Permissions.ADMIN),
   setUserPermissions
+);
+
+router.post(
+  '/window/open',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  openWindow
+);
+
+router.delete(
+  '/window/close',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  closeWindow
+);
+
+router.get(
+  '/window/status',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  windowStatus
 );
 
 export default router;
