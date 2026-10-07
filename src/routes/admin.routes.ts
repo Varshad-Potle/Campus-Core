@@ -4,10 +4,12 @@ import { Permissions } from '../utils/bitmask';
 import {
   applyBulkCooldown,
   clearBulkCooldown,
-  closeWindow,
-  openWindow,
   setUserPermissions,
+  openWindow,
+  closeWindow,
   windowStatus,
+  getAuditLog,
+  getAllStudents,
 } from '../controllers/admin.controller';
 
 
@@ -53,6 +55,20 @@ router.get(
   authenticate,
   requirePermission(Permissions.ADMIN),
   windowStatus
+);
+
+router.get(
+  '/audit-log',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  getAuditLog
+);
+
+router.get(
+  '/students',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  getAllStudents
 );
 
 export default router;

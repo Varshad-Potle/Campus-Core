@@ -167,3 +167,64 @@ export const windowStatus = async (
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const getAuditLog = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const result = await pool.query(
+      `SELECT 
+        a.id,
+        a.action,
+        a.metadata,
+        a.ip_address,
+        a.created_at,
+        u.name as admin_name,
+        u.email as admin_email,
+        t.name as target_name,
+        t.email as target_email
+       FROM audit_log a
+       LEFT JOIN users u ON a.admin_id = u.id
+       LEFT JOIN users t ON a.target_user_id = t.id
+       ORDER BY a.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    const countResult = await pool.query('SELECT COUNT(*) FROM audit_log');
+
+    res.json({
+      success: true,
+      data: {
+        logs: result.rows,
+        total: parseInt(countResult.rows[0].count),
+        limit,
+        offset,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getAllStudents = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, permission_mask, created_at
+       FROM users
+       WHERE role = 'student'
+       ORDER BY created_at DESC`
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
