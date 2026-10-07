@@ -12,7 +12,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use('/api/profile', profileRoutes);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -21,6 +20,7 @@ app.get('/health', (req, res) => {
   res.json({ success: true, message: 'CampusCore is running', timestamp: new Date().toISOString() });
 });
 
+app.use('/api/profile', profileRoutes);
 app.use('/api/auth', authRoutes);
 
 const start = async () => {
