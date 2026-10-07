@@ -5,12 +5,14 @@ import dotenv from 'dotenv';
 import { connectDB } from './config/database';
 import { connectRedis } from './config/redis';
 import authRoutes from './routes/auth.routes';
+import profileRoutes from './routes/profile.routes';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use('/api/profile', profileRoutes);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
