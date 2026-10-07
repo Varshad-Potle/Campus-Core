@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { pool } from '../config/database';
 import { signToken } from '../utils/jwt';
+import { DEFAULT_STUDENT_MASK, DEFAULT_ADMIN_MASK } from '../utils/bitmask';
 
 export const registerUser = async (
   name: string,
@@ -14,13 +15,13 @@ export const registerUser = async (
   }
 
   const hashed = await bcrypt.hash(password, 12);
-  const defaultMask = role === 'admin' ? 15 : 1;
+  const defaultMask = role === 'admin' ? DEFAULT_ADMIN_MASK : DEFAULT_STUDENT_MASK;
 
   const result = await pool.query(
     `INSERT INTO users (name, email, password, role, permission_mask)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, name, email, role, permission_mask`,
-    [name, email, hashed, role, defaultMask]
+    [name, email, hashed, role, defaultMask.toString()]
   );
 
   const user = result.rows[0];

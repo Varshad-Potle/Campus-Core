@@ -228,3 +228,30 @@ export const getAllStudents = async (
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const createStudentProfile = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId, rollNumber, branch, parentName } = req.body;
+
+    if (!userId || !rollNumber || !branch || !parentName) {
+      res.status(400).json({
+        success: false,
+        message: 'userId, rollNumber, branch and parentName are required',
+      });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO student_profiles (user_id, roll_number, branch, parent_name)
+       VALUES ($1, $2, $3, $4)`,
+      [userId, rollNumber, branch, parentName]
+    );
+
+    res.status(201).json({ success: true, message: 'Student profile created' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

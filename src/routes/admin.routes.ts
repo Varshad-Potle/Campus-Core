@@ -10,7 +10,10 @@ import {
   windowStatus,
   getAuditLog,
   getAllStudents,
+  createStudentProfile,
 } from '../controllers/admin.controller';
+import { excelUpload } from '../config/multer';
+import { uploadMarksExcel } from '../controllers/marks.controller';
 
 
 const router = Router();
@@ -69,6 +72,21 @@ router.get(
   authenticate,
   requirePermission(Permissions.ADMIN),
   getAllStudents
+);
+
+router.post(
+  '/marks/upload',
+  authenticate,
+  requirePermission(Permissions.UPLOAD_MARKS),
+  excelUpload.single('file'),
+  uploadMarksExcel
+);
+
+router.post(
+  '/students/profile',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  createStudentProfile
 );
 
 export default router;

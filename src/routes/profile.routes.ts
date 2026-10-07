@@ -3,6 +3,7 @@ import { authenticate, requirePermission, AuthRequest } from '../middleware/auth
 import { checkFieldCooldown } from '../middleware/cooldown.middleware';
 import { Permissions } from '../utils/bitmask';
 import { updateName } from '../controllers/profile.controller';
+import { getStudentMarks } from '../controllers/marks.controller';
 
 const router = Router();
 
@@ -23,4 +24,10 @@ router.patch(
   updateName
 );
 
+router.get(
+  '/marks',
+  authenticate,
+  requirePermission(Permissions.READ_RESULTS),
+  getStudentMarks
+);
 export default router;
