@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
-import { redisClient } from '../config/redis';
 import { hasPermission } from '../utils/bitmask';
+import { getCachedPermissions } from '../services/permission.service';
 import { JwtPayload } from '../types';
 
 export interface AuthRequest extends Request {
@@ -23,10 +23,8 @@ export const authenticate = async (
     const token = authHeader.split(' ')[1];
     const decoded = verifyToken(token);
 
-    const cached = await redisClient.get(`perms:${decoded.userId}`);
-    if (cached) {
-      decoded.permissionMask = cached;
-    }
+    const permissionMask = await getCachedPermissions(decoded.userId);
+    decoded.permissionMask = permissionMask.toString();
 
     req.user = decoded;
     next();
