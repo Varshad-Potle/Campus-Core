@@ -6,6 +6,7 @@ import { connectDB } from './config/database';
 import { connectRedis } from './config/redis';
 import authRoutes from './routes/auth.routes';
 import profileRoutes from './routes/profile.routes';
+import adminRoutes from './routes/admin.routes';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/profile', profileRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 const start = async () => {
   await connectDB();
