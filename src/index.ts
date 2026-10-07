@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './config/database';
 import { connectRedis } from './config/redis';
+import authRoutes from './routes/auth.routes';
 
 dotenv.config();
 
@@ -15,12 +16,10 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'CampusCore is running',
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ success: true, message: 'CampusCore is running', timestamp: new Date().toISOString() });
 });
+
+app.use('/api/auth', authRoutes);
 
 const start = async () => {
   await connectDB();
