@@ -2,6 +2,8 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { connectDB } from './config/database';
+import { connectRedis } from './config/redis';
 
 dotenv.config();
 
@@ -20,8 +22,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`CampusCore server running on port ${PORT}`);
-});
+const start = async () => {
+  await connectDB();
+  await connectRedis();
+  app.listen(PORT, () => {
+    console.log(`CampusCore server running on port ${PORT}`);
+  });
+};
+
+start();
 
 export default app;
