@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { authenticate, requirePermission, AuthRequest } from '../middleware/auth.middleware';
 import { checkFieldCooldown } from '../middleware/cooldown.middleware';
 import { Permissions } from '../utils/bitmask';
-import { updateName } from '../controllers/profile.controller';
+import { getMyProfile, getProfileUpdateStatus, updateName, updateProfile } from '../controllers/profile.controller';
 import { getStudentMarks } from '../controllers/marks.controller';
 
 const router = Router();
@@ -11,16 +11,28 @@ router.get(
   '/me',
   authenticate,
   requirePermission(Permissions.READ_PROFILE),
-  (req: AuthRequest, res: Response) => {
-    res.json({ success: true, data: req.user });
-  }
+  getMyProfile
+);
+
+router.patch(
+  '/update',
+  authenticate,
+  requirePermission(Permissions.UPDATE_PROFILE),
+  updateProfile
+);
+
+router.get(
+  '/update/status',
+  authenticate,
+  requirePermission(Permissions.READ_PROFILE),
+  getProfileUpdateStatus
 );
 
 router.patch(
   '/update/name',
   authenticate,
   requirePermission(Permissions.UPDATE_PROFILE),
-  checkFieldCooldown('name'),
+  checkFieldCooldown('profile'),
   updateName
 );
 

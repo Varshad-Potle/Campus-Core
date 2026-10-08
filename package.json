@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.6",
@@ -23,6 +24,7 @@
     "multer": "^2.4.0",
     "pg": "^8.23.1",
     "redis": "^6.3.0",
+    "tailwindcss": "^4.3.3",
     "uuid": "^14.0.2"
   },
   "devDependencies": {
