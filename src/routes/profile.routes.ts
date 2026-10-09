@@ -1,45 +1,56 @@
-import { Router, Response } from 'express';
-import { authenticate, requirePermission, AuthRequest } from '../middleware/auth.middleware';
-import { checkFieldCooldown } from '../middleware/cooldown.middleware';
+import { Router } from 'express';
+import { authenticate, requirePermission } from '../middleware/auth.middleware';
+import { checkCooldown } from '../middleware/cooldown.middleware';
 import { Permissions } from '../utils/bitmask';
-import { getMyProfile, getProfileUpdateStatus, updateName, updateProfile } from '../controllers/profile.controller';
-import { getStudentMarks } from '../controllers/marks.controller';
+import { photoUpload, resumeUpload, documentsUpload } from '../config/multer';
+import {
+  getProfile,
+  updateProfile,
+  uploadPhoto,
+  uploadResume,
+  uploadDocuments,
+  getCooldownStatus,
+} from '../controllers/profile.controller';
 
 const router = Router();
 
-router.get(
-  '/me',
-  authenticate,
-  requirePermission(Permissions.READ_PROFILE),
-  getMyProfile
-);
+router.get('/me', authenticate, requirePermission(Permissions.READ_PROFILE), getProfile);
+
+router.get('/cooldown', authenticate, getCooldownStatus);
 
 router.patch(
   '/update',
   authenticate,
   requirePermission(Permissions.UPDATE_PROFILE),
+  checkCooldown,
   updateProfile
 );
 
-router.get(
-  '/update/status',
+router.post(
+  '/photo',
   authenticate,
-  requirePermission(Permissions.READ_PROFILE),
-  getProfileUpdateStatus
+  requirePermission(Permissions.UPLOAD_FILES),
+  checkCooldown,
+  photoUpload.single('photo'),
+  uploadPhoto
 );
 
-router.patch(
-  '/update/name',
+router.post(
+  '/resume',
   authenticate,
-  requirePermission(Permissions.UPDATE_PROFILE),
-  checkFieldCooldown('profile'),
-  updateName
+  requirePermission(Permissions.UPLOAD_FILES),
+  checkCooldown,
+  resumeUpload.single('resume'),
+  uploadResume
 );
 
-router.get(
-  '/marks',
+router.post(
+  '/documents',
   authenticate,
-  requirePermission(Permissions.READ_RESULTS),
-  getStudentMarks
+  requirePermission(Permissions.UPLOAD_FILES),
+  checkCooldown,
+  documentsUpload.single('documents'),
+  uploadDocuments
 );
+
 export default router;
