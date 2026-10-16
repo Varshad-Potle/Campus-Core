@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Upload, FileText, Image, X } from 'lucide-react';
 
@@ -7,9 +7,10 @@ interface FileUploadProps {
   maxSizeMB: number;
   label: string;
   hint?: string;
-  onFile: (file: File) => void;
+  onFile: (file: File | null) => void;
   type?: 'image' | 'pdf';
   className?: string;
+  reset?: boolean;
 }
 
 export function FileUpload({
@@ -20,19 +21,50 @@ export function FileUpload({
   onFile,
   type = 'pdf',
   className,
+  reset,
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [dragging, setDragging] = useState(false);
 
+  useEffect(() => {
+    if (reset) {
+      setSelected(null);
+      setError('');
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }, [reset]);
+
   const handle = (file: File) => {
-    setError('');
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`File must be under ${maxSizeMB}MB`);
+    const maxSize = maxSizeMB * 1024 * 1024;
+    const acceptedTypes = accept.split(',').map((value) => value.trim()).filter(Boolean);
+    const typeAccepted = acceptedTypes.some((acceptedType) => {
+      if (acceptedType.startsWith('.')) {
+        return file.name.toLowerCase().endsWith(acceptedType.toLowerCase());
+      }
+      if (acceptedType.endsWith('/*')) {
+        return file.type.startsWith(acceptedType.slice(0, -1));
+      }
+      return file.type === acceptedType;
+    });
+
+    if (!typeAccepted) {
+      setSelected(null);
+      setError(`Invalid file type. Accepted: ${accept}`);
+      onFile(null);
       return;
     }
+
+    if (file.size > maxSize) {
+      setSelected(null);
+      setError(`File must be smaller than ${maxSizeMB}MB`);
+      onFile(null);
+      return;
+    }
+
     setSelected(file);
+    setError('');
     onFile(file);
   };
 
@@ -66,7 +98,13 @@ export function FileUpload({
               {(selected.size / 1024).toFixed(1)} KB
             </p>
             <button
-              onClick={(e) => { e.stopPropagation(); setSelected(null); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelected(null);
+                setError('');
+                onFile(null);
+                if (inputRef.current) inputRef.current.value = '';
+              }}
               className="mt-1 flex items-center gap-1 text-xs text-red-500 hover:text-red-700"
             >
               <X className="w-3 h-3" /> Remove

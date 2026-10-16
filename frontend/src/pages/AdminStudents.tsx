@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/shared/Navbar';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
+import { FileUpload } from '@/components/ui/FileUpload';
 import { ToastContainer } from '@/components/ui/Toast';
 import { useToast } from '@/hooks/useToast';
 import { formatDate } from '@/lib/utils';
@@ -36,6 +37,14 @@ export default function AdminStudents() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Student | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
 
   const fetchStudents = async () => {
     try {
@@ -59,6 +68,22 @@ export default function AdminStudents() {
       setStudents([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    try {
+      const form = new FormData();
+      form.append('file', importFile);
+      const res = await api.post('/admin/students/import', form);
+      setImportResult(res.data.data);
+      fetchStudents();
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Import failed', 'error');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -139,6 +164,12 @@ export default function AdminStudents() {
               <X className="w-4 h-4" />
             </button>
           )}
+          <button
+            onClick={() => { setShowImport(true); setImportResult(null); }}
+            className="h-10 px-4 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
+            Import Excel
+          </button>
         </div>
 
         <DataTable
@@ -149,6 +180,77 @@ export default function AdminStudents() {
           onRowClick={(row) => setSelected(row)}
         />
       </div>
+
+      {showImport && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-3xl border border-border p-6 max-w-md w-full mx-4 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-foreground">Import Students</h2>
+              <button onClick={() => setShowImport(false)}>
+                <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+
+            <div className="bg-muted rounded-2xl p-4 text-xs text-muted-foreground">
+              <p className="font-semibold text-foreground mb-1">Required Excel columns:</p>
+              <p className="font-mono">name, email, roll_number, branch, parent_name</p>
+              <p className="mt-2">
+                Default password will be{' '}
+                <span className="font-mono font-semibold text-foreground">
+                  GCOEA@{'<roll_number>'}
+                </span>
+              </p>
+            </div>
+
+            {importResult ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-3">
+                  <div className="flex-1 bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+                    <p className="text-2xl font-bold text-green-800">{importResult.imported}</p>
+                    <p className="text-xs text-green-600 mt-1">Imported</p>
+                  </div>
+                  <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
+                    <p className="text-2xl font-bold text-yellow-800">{importResult.skipped}</p>
+                    <p className="text-xs text-yellow-600 mt-1">Skipped</p>
+                  </div>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
+                    <p className="text-xs font-semibold text-red-800 mb-1">Errors:</p>
+                    {importResult.errors.map((error, index) => (
+                      <p key={`${error}-${index}`} className="text-xs text-red-600">{error}</p>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowImport(false)}
+                  className="h-10 w-full rounded-xl bg-primary text-primary-foreground text-sm font-medium"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <FileUpload
+                  accept=".xlsx,.xls"
+                  maxSizeMB={10}
+                  label="Upload Student Excel"
+                  hint=".xlsx file with required columns"
+                  type="pdf"
+                  onFile={setImportFile}
+                />
+                <button
+                  onClick={handleImport}
+                  disabled={!importFile || importing}
+                  className="h-10 w-full rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {importing ? 'Importing...' : 'Import Students'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Student profile drawer */}
       {selected && (
@@ -217,25 +319,32 @@ export default function AdminStudents() {
             </div>
 
             <div className="flex flex-col gap-2">
-              {selected.resume_url && (
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Documents
+              </p>
+              {selected.resume_url ? (
                 <a
                   href={selected.resume_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:underline"
+                  className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors"
                 >
-                  View Resume →
+                  <span>📄</span> View Resume
                 </a>
+              ) : (
+                <p className="text-sm text-muted-foreground">No resume uploaded</p>
               )}
-              {selected.documents_url && (
+              {selected.documents_url ? (
                 <a
                   href={selected.documents_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:underline"
+                  className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors"
                 >
-                  View Documents →
+                  <span>📋</span> View Documents
                 </a>
+              ) : (
+                <p className="text-sm text-muted-foreground">No documents uploaded</p>
               )}
             </div>
           </div>

@@ -5,12 +5,14 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import AdminStudents from '@/pages/AdminStudents';
 import AdminAuditLog from '@/pages/AdminAuditLog';
 import StudentDashboard from '@/pages/StudentDashboard';
+import ChangePasswordPage from '@/pages/ChangePasswordPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
 
         <Route
           path="/admin"

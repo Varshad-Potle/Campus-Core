@@ -9,6 +9,7 @@ import {
 } from '../services/updateWindow.service';
 import { pool } from '../config/database';
 import { v4 as uuidv4 } from 'uuid';
+import { parseImportExcel, importStudents } from '../services/import.service';
 
 export const applyBulkCooldown = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -165,8 +166,10 @@ export const getAllStudents = async (req: AuthRequest, res: Response): Promise<v
   try {
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.role, u.created_at,
-              sp.roll_number, sp.branch, sp.year, sp.placement_status,
-              sp.company_name, sp.job_role, sp.ctc_lakhs, sp.photo_url
+              sp.roll_number, sp.branch, sp.parent_name, sp.year,
+              sp.phone, sp.permanent_address,
+              sp.placement_status, sp.company_name, sp.job_role, sp.ctc_lakhs,
+              sp.photo_url, sp.resume_url, sp.documents_url
        FROM users u
        LEFT JOIN student_profiles sp ON sp.user_id = u.id
        WHERE u.role = 'student'
@@ -256,6 +259,28 @@ export const createStudentProfile = async (req: AuthRequest, res: Response): Pro
     );
 
     res.status(201).json({ success: true, message: 'Student profile created' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const importStudentsExcel = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, message: 'Excel file is required' });
+      return;
+    }
+
+    const rows = await parseImportExcel(req.file.buffer);
+
+    if (rows.length === 0) {
+      res.status(400).json({ success: false, message: 'No valid rows found in Excel file' });
+      return;
+    }
+
+    const result = await importStudents(rows, req.user!.userId);
+
+    res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

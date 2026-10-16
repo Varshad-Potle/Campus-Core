@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import { Eye, EyeOff, GraduationCap } from 'lucide-react';
 
 export default function LoginPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
   const [email, setEmail] = useState('');
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const successMessage = (location.state as { message?: string } | null)?.message;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +23,12 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       const { user, token } = res.data.data;
       setAuth(user, token);
+
+      if (user.is_first_login && user.role === 'student') {
+        navigate('/change-password');
+        return;
+      }
+
       navigate(user.role === 'admin' ? '/admin' : '/student');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
@@ -43,6 +51,12 @@ export default function LoginPage() {
           <p className="text-sm text-muted-foreground mb-8">
             Enter your credentials to access your account
           </p>
+
+          {successMessage && (
+            <div className="mb-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">
+              {successMessage}
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">

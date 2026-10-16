@@ -61,6 +61,7 @@ export const loginUser = async (email: string, password: string) => {
       email: user.email,
       role: user.role,
       permission_mask: user.permission_mask,
+      is_first_login: user.is_first_login,
     },
     token,
   };

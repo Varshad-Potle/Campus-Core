@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requirePermission } from '../middleware/auth.middleware';
 import { Permissions } from '../utils/bitmask';
+import { excelUpload } from '../config/multer';
 import {
   applyBulkCooldown,
   clearBulkCooldown,
@@ -14,6 +15,7 @@ import {
   searchStudentByRoll,
   getStats,
   createStudentProfile,
+  importStudentsExcel,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -32,5 +34,12 @@ router.get('/students', authenticate, requirePermission(Permissions.ADMIN), getA
 router.get('/students/search', authenticate, requirePermission(Permissions.ADMIN), searchStudentByRoll);
 router.get('/stats', authenticate, requirePermission(Permissions.ADMIN), getStats);
 router.post('/students/profile', authenticate, requirePermission(Permissions.ADMIN), createStudentProfile);
+router.post(
+  '/students/import',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  excelUpload.single('file'),
+  importStudentsExcel
+);
 
 export default router;

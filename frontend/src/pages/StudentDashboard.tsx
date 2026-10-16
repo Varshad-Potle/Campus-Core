@@ -82,6 +82,10 @@ export default function StudentDashboard() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [documentsFile, setDocumentsFile] = useState<File | null>(null);
+  const [windowOpen, setWindowOpen] = useState(false);
+  const [resetPhoto, setResetPhoto] = useState(false);
+  const [resetResume, setResetResume] = useState(false);
+  const [resetDocuments, setResetDocuments] = useState(false);
 
   const fetchProfile = async () => {
     try {
@@ -100,8 +104,6 @@ export default function StudentDashboard() {
       setLoading(false);
     }
   };
-
-  useEffect(() => { fetchProfile(); }, []);
 
   const handleSaveProfile = async () => {
     try {
@@ -122,46 +124,60 @@ export default function StudentDashboard() {
   };
 
   const handlePhotoUpload = async () => {
-    if (!photoFile) return;
-    const form = new FormData();
-    form.append('photo', photoFile);
-    try {
-      await api.post('/profile/photo', form);
-      addToast('Photo uploaded successfully', 'success');
-      setPhotoFile(null);
-      fetchProfile();
-    } catch (err: any) {
-      addToast(err.response?.data?.message || 'Photo upload failed', 'error');
-    }
-  };
+  if (!photoFile) return;
+  const form = new FormData();
+  form.append('photo', photoFile);
+  try {
+    await api.post('/profile/photo', form);
+    addToast('Photo uploaded successfully', 'success');
+    setPhotoFile(null);
+    setResetPhoto(true);
+    setTimeout(() => setResetPhoto(false), 100);
+    fetchProfile();
+  } catch (err: any) {
+    addToast(err.response?.data?.message || 'Photo upload failed', 'error');
+  }
+};
 
   const handleResumeUpload = async () => {
-    if (!resumeFile) return;
-    const form = new FormData();
-    form.append('resume', resumeFile);
-    try {
-      await api.post('/profile/resume', form);
-      addToast('Resume uploaded successfully', 'success');
-      setResumeFile(null);
-      fetchProfile();
-    } catch (err: any) {
-      addToast(err.response?.data?.message || 'Resume upload failed', 'error');
-    }
-  };
+  if (!resumeFile) return;
+  const form = new FormData();
+  form.append('resume', resumeFile);
+  try {
+    await api.post('/profile/resume', form);
+    addToast('Resume uploaded successfully', 'success');
+    setResumeFile(null);
+    setResetResume(true);
+    setTimeout(() => setResetResume(false), 100);
+    fetchProfile();
+  } catch (err: any) {
+    addToast(err.response?.data?.message || 'Resume upload failed', 'error');
+  }
+};
 
   const handleDocumentsUpload = async () => {
-    if (!documentsFile) return;
-    const form = new FormData();
-    form.append('documents', documentsFile);
-    try {
-      await api.post('/profile/documents', form);
-      addToast('Documents uploaded successfully', 'success');
-      setDocumentsFile(null);
-      fetchProfile();
-    } catch (err: any) {
-      addToast(err.response?.data?.message || 'Documents upload failed', 'error');
-    }
-  };
+  if (!documentsFile) return;
+  const form = new FormData();
+  form.append('documents', documentsFile);
+  try {
+    await api.post('/profile/documents', form);
+    addToast('Documents uploaded successfully', 'success');
+    setDocumentsFile(null);
+    setResetDocuments(true);
+    setTimeout(() => setResetDocuments(false), 100);
+    fetchProfile();
+  } catch (err: any) {
+    addToast(err.response?.data?.message || 'Documents upload failed', 'error');
+  }
+};
+
+  useEffect(() => {
+    fetchProfile();
+    api.get('/admin/window/active').then(res => {
+      console.log('window:', res.data);
+      setWindowOpen(res.data.data.open);
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -171,8 +187,6 @@ export default function StudentDashboard() {
     );
   }
 
-  const locked = profile?.cooldown.blocked && !editing;
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -181,7 +195,7 @@ export default function StudentDashboard() {
         <WindowBanner />
 
         {/* Cooldown banner */}
-        {profile?.cooldown.blocked && (
+        {profile?.cooldown.blocked && !windowOpen && (
           <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3">
             <Lock className="w-4 h-4 text-orange-600 shrink-0" />
             <p className="text-sm text-orange-800">
@@ -246,7 +260,7 @@ export default function StudentDashboard() {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Updatable Information
             </p>
-            {!editing && !profile?.cooldown.blocked && (
+            {!editing && (!profile?.cooldown.blocked || windowOpen) && (
               <button
                 onClick={() => setEditing(true)}
                 className="text-xs font-medium text-primary hover:underline"
@@ -359,7 +373,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* File uploads */}
-        {!locked && (
+        {(!profile?.cooldown.blocked || windowOpen) && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-card border border-border rounded-3xl p-4 flex flex-col gap-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -377,6 +391,7 @@ export default function StudentDashboard() {
                 hint="JPG or PNG, max 2MB"
                 type="image"
                 onFile={setPhotoFile}
+                reset={resetPhoto}
               />
               {photoFile && (
                 <button
@@ -412,6 +427,7 @@ export default function StudentDashboard() {
                 hint="PDF only, max 5MB"
                 type="pdf"
                 onFile={setResumeFile}
+                reset={resetResume}
               />
               {resumeFile && (
                 <button
@@ -447,6 +463,7 @@ export default function StudentDashboard() {
                 hint="Consolidated PDF (10th, 12th, ID), max 10MB"
                 type="pdf"
                 onFile={setDocumentsFile}
+                reset={resetDocuments}
               />
               {documentsFile && (
                 <button
