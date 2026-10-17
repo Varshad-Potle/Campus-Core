@@ -12,10 +12,12 @@ import {
   getActiveWindow,
   getAuditLog,
   getAllStudents,
-  searchStudentByRoll,
+  searchStudent,
   getStats,
   createStudentProfile,
   importStudentsExcel,
+  getPasswordResetRequests,
+  resetStudentPassword,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -31,7 +33,7 @@ router.get('/window/active', authenticate, getActiveWindow);
 
 router.get('/audit-log', authenticate, requirePermission(Permissions.ADMIN), getAuditLog);
 router.get('/students', authenticate, requirePermission(Permissions.ADMIN), getAllStudents);
-router.get('/students/search', authenticate, requirePermission(Permissions.ADMIN), searchStudentByRoll);
+router.get('/students/search', authenticate, requirePermission(Permissions.ADMIN), searchStudent);
 router.get('/stats', authenticate, requirePermission(Permissions.ADMIN), getStats);
 router.post('/students/profile', authenticate, requirePermission(Permissions.ADMIN), createStudentProfile);
 router.post(
@@ -40,6 +42,18 @@ router.post(
   requirePermission(Permissions.ADMIN),
   excelUpload.single('file'),
   importStudentsExcel
+);
+router.get(
+  '/password-reset-requests',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  getPasswordResetRequests
+);
+router.post(
+  '/students/:userId/reset-password',
+  authenticate,
+  requirePermission(Permissions.ADMIN),
+  resetStudentPassword
 );
 
 export default router;

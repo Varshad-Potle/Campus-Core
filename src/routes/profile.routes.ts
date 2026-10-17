@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { authenticate, requirePermission } from '../middleware/auth.middleware';
+import { Response, Router } from 'express';
+import { authenticate, AuthRequest, requirePermission } from '../middleware/auth.middleware';
 import { checkCooldown } from '../middleware/cooldown.middleware';
 import { Permissions } from '../utils/bitmask';
 import { photoUpload, resumeUpload, documentsUpload } from '../config/multer';
@@ -10,9 +10,19 @@ import {
   uploadResume,
   uploadDocuments,
   getCooldownStatus,
+  finalSubmit,
 } from '../controllers/profile.controller';
 
 const router = Router();
+
+router.get(
+  '/rbac-bench',
+  authenticate,
+  requirePermission(Permissions.READ_PROFILE),
+  (req: AuthRequest, res: Response) => {
+    res.json({ success: true, ts: Date.now() });
+  }
+);
 
 router.get('/me', authenticate, requirePermission(Permissions.READ_PROFILE), getProfile);
 
@@ -27,30 +37,35 @@ router.patch(
 );
 
 router.post(
-  '/photo',
+  '/photo/temp',
   authenticate,
   requirePermission(Permissions.UPLOAD_FILES),
-  checkCooldown,
   photoUpload.single('photo'),
   uploadPhoto
 );
 
 router.post(
-  '/resume',
+  '/resume/temp',
   authenticate,
   requirePermission(Permissions.UPLOAD_FILES),
-  checkCooldown,
   resumeUpload.single('resume'),
   uploadResume
 );
 
 router.post(
-  '/documents',
+  '/documents/temp',
   authenticate,
   requirePermission(Permissions.UPLOAD_FILES),
-  checkCooldown,
   documentsUpload.single('documents'),
   uploadDocuments
+);
+
+router.post(
+  '/submit',
+  authenticate,
+  requirePermission(Permissions.UPDATE_PROFILE),
+  checkCooldown,
+  finalSubmit
 );
 
 export default router;

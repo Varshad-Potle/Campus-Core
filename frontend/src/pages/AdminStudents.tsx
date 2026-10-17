@@ -35,8 +35,11 @@ export default function AdminStudents() {
   const { toasts, addToast, removeToast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [rollSearch, setRollSearch] = useState('');
+  const [companySearch, setCompanySearch] = useState('');
   const [selected, setSelected] = useState<Student | null>(null);
+  const [resetRequests, setResetRequests] = useState<any[]>([]);
+  const [showResetRequests, setShowResetRequests] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -57,14 +60,40 @@ export default function AdminStudents() {
     }
   };
 
-  const searchByRoll = async () => {
-    if (!search.trim()) { fetchStudents(); return; }
+  const fetchResetRequests = async () => {
+    try {
+      const res = await api.get('/admin/password-reset-requests');
+      setResetRequests(res.data.data);
+    } catch {
+      addToast('Failed to load reset requests', 'error');
+    }
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    try {
+      await api.post(`/admin/students/${userId}/reset-password`);
+      addToast('Password reset successfully', 'success');
+      fetchResetRequests();
+      fetchStudents();
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Reset failed', 'error');
+    }
+  };
+
+  const searchStudents = async () => {
+    if (!rollSearch.trim() && !companySearch.trim()) {
+      fetchStudents();
+      return;
+    }
     setLoading(true);
     try {
-      const res = await api.get(`/admin/students/search?rollNo=${search}`);
-      setStudents([res.data.data]);
+      const params = new URLSearchParams();
+      if (rollSearch.trim()) params.append('rollNo', rollSearch.trim());
+      if (companySearch.trim()) params.append('company', companySearch.trim());
+      const res = await api.get(`/admin/students/search?${params.toString()}`);
+      setStudents(Array.isArray(res.data.data) ? res.data.data : [res.data.data]);
     } catch {
-      addToast('No student found with that roll number', 'error');
+      addToast('No students found', 'error');
       setStudents([]);
     } finally {
       setLoading(false);
@@ -87,7 +116,7 @@ export default function AdminStudents() {
     }
   };
 
-  useEffect(() => { fetchStudents(); }, []);
+  useEffect(() => { fetchStudents(); fetchResetRequests(); }, []);
 
   const columns = [
     { key: 'roll_number', label: 'Roll No' },
@@ -139,26 +168,36 @@ export default function AdminStudents() {
         </div>
 
         {/* Search */}
-        <div className="flex gap-2">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex gap-2 flex-wrap">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && searchByRoll()}
+              value={rollSearch}
+              onChange={(e) => setRollSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && searchStudents()}
               placeholder="Search by roll number..."
-              className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-10 w-48 rounded-xl border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              value={companySearch}
+              onChange={(e) => setCompanySearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && searchStudents()}
+              placeholder="Search by company..."
+              className="h-10 w-48 rounded-xl border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <button
-            onClick={searchByRoll}
+            onClick={searchStudents}
             className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             Search
           </button>
-          {search && (
+          {(rollSearch || companySearch) && (
             <button
-              onClick={() => { setSearch(''); fetchStudents(); }}
+              onClick={() => { setRollSearch(''); setCompanySearch(''); fetchStudents(); }}
               className="h-10 px-3 rounded-xl border border-border text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="w-4 h-4" />
@@ -169,6 +208,17 @@ export default function AdminStudents() {
             className="h-10 px-4 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
           >
             Import Excel
+          </button>
+          <button
+            onClick={() => setShowResetRequests(true)}
+            className="h-10 px-4 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors relative"
+          >
+            Reset Requests
+            {resetRequests.filter((r) => r.status === 'pending').length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                {resetRequests.filter((r) => r.status === 'pending').length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -258,7 +308,14 @@ export default function AdminStudents() {
           <div className="flex-1 bg-black/40" onClick={() => setSelected(null)} />
           <div className="w-full max-w-md bg-background border-l border-border overflow-y-auto p-6 flex flex-col gap-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg text-foreground">Student Profile</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-lg text-foreground">Student Profile</h2>
+                {resetRequests.find((r) => r.user_id === selected.id && r.status === 'pending') && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                    Password Reset Pending
+                  </span>
+                )}
+              </div>
               <button onClick={() => setSelected(null)}>
                 <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </button>
@@ -346,7 +403,60 @@ export default function AdminStudents() {
               ) : (
                 <p className="text-sm text-muted-foreground">No documents uploaded</p>
               )}
+              {resetRequests.find((r) => r.user_id === selected?.id && r.status === 'pending') && (
+                <button
+                  onClick={() => selected && handleResetPassword(selected.id)}
+                  className="h-10 w-full rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+                >
+                  Reset Password → GCOEA@{selected?.roll_number}
+                </button>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showResetRequests && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-3xl border border-border p-6 max-w-lg w-full mx-4 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-foreground">Password Reset Requests</h2>
+              <button onClick={() => setShowResetRequests(false)}>
+                <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+
+            {resetRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No requests yet</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {resetRequests.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between p-4 rounded-2xl border border-border bg-muted/30">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{r.name}</p>
+                      <p className="text-xs text-muted-foreground">{r.roll_number} · {r.branch}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Requested {formatDate(r.requested_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {r.status === 'pending' ? (
+                        <button
+                          onClick={() => handleResetPassword(r.user_id)}
+                          className="h-8 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                        >
+                          Reset
+                        </button>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                          Resolved
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

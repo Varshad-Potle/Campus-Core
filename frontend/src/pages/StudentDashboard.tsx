@@ -6,7 +6,7 @@ import { FileUpload } from '@/components/ui/FileUpload';
 import { ToastContainer } from '@/components/ui/Toast';
 import { useToast } from '@/hooks/useToast';
 import api from '@/lib/api';
-import { User, Lock, CheckCircle } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -32,7 +32,6 @@ interface Profile {
   };
 }
 
-// Confirm dialog
 function ConfirmDialog({
   message,
   onConfirm,
@@ -51,7 +50,7 @@ function ConfirmDialog({
             onClick={onConfirm}
             className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
           >
-            Confirm
+            Confirm & Submit
           </button>
           <button
             onClick={onCancel}
@@ -69,8 +68,9 @@ export default function StudentDashboard() {
   const { toasts, addToast, removeToast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [confirm, setConfirm] = useState<null | { message: string; action: () => void }>(null);
+  const [windowOpen, setWindowOpen] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Form state
   const [phone, setPhone] = useState('');
@@ -79,19 +79,29 @@ export default function StudentDashboard() {
   const [company, setCompany] = useState('');
   const [jobRole, setJobRole] = useState('');
   const [ctc, setCtc] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+
+  // File state
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [documentsFile, setDocumentsFile] = useState<File | null>(null);
-  const [windowOpen, setWindowOpen] = useState(false);
   const [resetPhoto, setResetPhoto] = useState(false);
   const [resetResume, setResetResume] = useState(false);
   const [resetDocuments, setResetDocuments] = useState(false);
 
+  const allFilesSelected = !!photoFile && !!resumeFile && !!documentsFile;
+  const someFilesSelected = !!photoFile || !!resumeFile || !!documentsFile;
+
   const fetchProfile = async () => {
     try {
-      const res = await api.get('/profile/me');
-      const p = res.data.data;
+      const [profileRes, windowRes] = await Promise.all([
+        api.get('/profile/me'),
+        api.get('/admin/window/active'),
+      ]);
+      const p = profileRes.data.data;
       setProfile(p);
+      setWindowOpen(windowRes.data.data.open);
+      // Load from server fresh — no localStorage restore
       setPhone(p.phone || '');
       setAddress(p.permanent_address || '');
       setPlacementStatus(p.placement_status || 'unplaced');
@@ -105,9 +115,42 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleSaveProfile = async () => {
+  useEffect(() => { fetchProfile(); }, []);
+
+  const canEdit = !profile?.cooldown.blocked || windowOpen;
+
+  const validatePhone = (value: string) => {
+    if (value && !/^\d{10}$/.test(value)) {
+      setPhoneError('Phone must be exactly 10 digits');
+      return false;
+    }
+    setPhoneError('');
+    return true;
+  };
+
+  const handleFinalSubmit = async () => {
+    if (phone && !validatePhone(phone)) return;
+    setSubmitting(true);
     try {
-      await api.patch('/profile/update', {
+      // Step 1: Upload files if selected
+      if (photoFile) {
+        const form = new FormData();
+        form.append('photo', photoFile);
+        await api.post('/profile/photo/temp', form);
+      }
+      if (resumeFile) {
+        const form = new FormData();
+        form.append('resume', resumeFile);
+        await api.post('/profile/resume/temp', form);
+      }
+      if (documentsFile) {
+        const form = new FormData();
+        form.append('documents', documentsFile);
+        await api.post('/profile/documents/temp', form);
+      }
+
+      // Step 2: Submit profile data — this applies cooldown
+      await api.post('/profile/submit', {
         phone: phone || undefined,
         permanent_address: address || undefined,
         placement_status: placementStatus,
@@ -115,69 +158,29 @@ export default function StudentDashboard() {
         job_role: placementStatus === 'placed' ? jobRole : undefined,
         ctc_lakhs: placementStatus === 'placed' ? parseFloat(ctc) : undefined,
       });
-      addToast('Profile updated successfully', 'success');
-      setEditing(false);
+
+      addToast('Profile submitted successfully. Locked for 15 days.', 'success');
+
+      // Reset file state
+      setPhotoFile(null);
+      setResumeFile(null);
+      setDocumentsFile(null);
+      setResetPhoto(true);
+      setResetResume(true);
+      setResetDocuments(true);
+      setTimeout(() => {
+        setResetPhoto(false);
+        setResetResume(false);
+        setResetDocuments(false);
+      }, 100);
+
       fetchProfile();
     } catch (err: any) {
-      addToast(err.response?.data?.message || 'Update failed', 'error');
+      addToast(err.response?.data?.message || 'Submission failed', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
-
-  const handlePhotoUpload = async () => {
-  if (!photoFile) return;
-  const form = new FormData();
-  form.append('photo', photoFile);
-  try {
-    await api.post('/profile/photo', form);
-    addToast('Photo uploaded successfully', 'success');
-    setPhotoFile(null);
-    setResetPhoto(true);
-    setTimeout(() => setResetPhoto(false), 100);
-    fetchProfile();
-  } catch (err: any) {
-    addToast(err.response?.data?.message || 'Photo upload failed', 'error');
-  }
-};
-
-  const handleResumeUpload = async () => {
-  if (!resumeFile) return;
-  const form = new FormData();
-  form.append('resume', resumeFile);
-  try {
-    await api.post('/profile/resume', form);
-    addToast('Resume uploaded successfully', 'success');
-    setResumeFile(null);
-    setResetResume(true);
-    setTimeout(() => setResetResume(false), 100);
-    fetchProfile();
-  } catch (err: any) {
-    addToast(err.response?.data?.message || 'Resume upload failed', 'error');
-  }
-};
-
-  const handleDocumentsUpload = async () => {
-  if (!documentsFile) return;
-  const form = new FormData();
-  form.append('documents', documentsFile);
-  try {
-    await api.post('/profile/documents', form);
-    addToast('Documents uploaded successfully', 'success');
-    setDocumentsFile(null);
-    setResetDocuments(true);
-    setTimeout(() => setResetDocuments(false), 100);
-    fetchProfile();
-  } catch (err: any) {
-    addToast(err.response?.data?.message || 'Documents upload failed', 'error');
-  }
-};
-
-  useEffect(() => {
-    fetchProfile();
-    api.get('/admin/window/active').then(res => {
-      console.log('window:', res.data);
-      setWindowOpen(res.data.data.open);
-    });
-  }, []);
 
   if (loading) {
     return (
@@ -200,7 +203,7 @@ export default function StudentDashboard() {
             <Lock className="w-4 h-4 text-orange-600 shrink-0" />
             <p className="text-sm text-orange-800">
               Profile locked for <strong>{profile.cooldown.remainingDays} more days</strong>.
-              Changes locked until cooldown expires.
+              Changes are locked until cooldown expires.
             </p>
           </div>
         )}
@@ -233,7 +236,7 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Non-changeable info */}
+        {/* Fixed info */}
         <div className="bg-card border border-border rounded-3xl p-6">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             Fixed Information
@@ -254,240 +257,189 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Editable info */}
+        {/* Editable fields */}
         <div className="bg-card border border-border rounded-3xl p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Updatable Information
-            </p>
-            {!editing && (!profile?.cooldown.blocked || windowOpen) && (
-              <button
-                onClick={() => setEditing(true)}
-                className="text-xs font-medium text-primary hover:underline"
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Updatable Information
+            {!canEdit && <span className="ml-2 text-orange-500 normal-case font-normal">— locked</span>}
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Phone <span className="text-muted-foreground/60">(10 digits)</span>
+              </label>
+              <input
+                value={phone}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setPhone(val);
+                  if (phoneError) validatePhone(val);
+                }}
+                disabled={!canEdit}
+                placeholder="10-digit number"
+                className="h-10 rounded-xl border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Placement Status</label>
+              <select
+                value={placementStatus}
+                onChange={(e) => setPlacementStatus(e.target.value)}
+                disabled={!canEdit}
+                className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Edit
-              </button>
-            )}
+                <option value="unplaced">Unplaced</option>
+                <option value="placed">Placed</option>
+              </select>
+            </div>
           </div>
 
-          {editing ? (
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Phone</label>
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Placement Status</label>
-                  <select
-                    value={placementStatus}
-                    onChange={(e) => setPlacementStatus(e.target.value)}
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="unplaced">Unplaced</option>
-                    <option value="placed">Placed</option>
-                  </select>
-                </div>
-              </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Permanent Address</label>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={!canEdit}
+              rows={2}
+              className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
 
+          {placementStatus === 'placed' && (
+            <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Permanent Address</label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  rows={2}
-                  className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                <label className="text-xs font-medium text-muted-foreground">Company</label>
+                <input
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  disabled={!canEdit}
+                  className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
-
-              {placementStatus === 'placed' && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Company</label>
-                    <input
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Job Role</label>
-                    <input
-                      value={jobRole}
-                      onChange={(e) => setJobRole(e.target.value)}
-                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">CTC (Lakhs)</label>
-                    <input
-                      type="number"
-                      value={ctc}
-                      onChange={(e) => setCtc(e.target.value)}
-                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() =>
-                    setConfirm({
-                      message: 'Are you sure you want to save changes? Your profile will be locked for 15 days.',
-                      action: handleSaveProfile,
-                    })
-                  }
-                  className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={() => setEditing(false)}
-                  className="h-10 px-4 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Job Role</label>
+                <input
+                  value={jobRole}
+                  onChange={(e) => setJobRole(e.target.value)}
+                  disabled={!canEdit}
+                  className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                />
               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Phone', value: profile?.phone || '—' },
-                { label: 'Address', value: profile?.permanent_address || '—' },
-                { label: 'Company', value: profile?.company_name || '—' },
-                { label: 'Job Role', value: profile?.job_role || '—' },
-                { label: 'CTC', value: profile?.ctc_lakhs ? `₹${profile.ctc_lakhs}L` : '—' },
-              ].map((item) => (
-                <div key={item.label}>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
-                  <p className="text-sm font-medium text-foreground mt-0.5">{item.value}</p>
-                </div>
-              ))}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">CTC (Lakhs)</label>
+                <input
+                  type="number"
+                  value={ctc}
+                  onChange={(e) => setCtc(e.target.value)}
+                  disabled={!canEdit}
+                  className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
           )}
         </div>
 
-        {/* File uploads */}
-        {(!profile?.cooldown.blocked || windowOpen) && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-card border border-border rounded-3xl p-4 flex flex-col gap-3">
+        {/* Document uploads */}
+        {canEdit && (
+          <div className="bg-card border border-border rounded-3xl p-6 flex flex-col gap-4">
+            <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Photo
+                Document Uploads
               </p>
-              {profile?.photo_url && (
-                <div className="flex items-center gap-2 text-xs text-green-600">
-                  <CheckCircle className="w-3.5 h-3.5" /> Uploaded
-                </div>
-              )}
-              <FileUpload
-                accept="image/jpeg,image/png"
-                maxSizeMB={2}
-                label="Upload Photo"
-                hint="JPG or PNG, max 2MB"
-                type="image"
-                onFile={setPhotoFile}
-                reset={resetPhoto}
-              />
-              {photoFile && (
-                <button
-                  onClick={() =>
-                    setConfirm({
-                      message: 'Upload this photo? Your profile will be locked for 15 days.',
-                      action: handlePhotoUpload,
-                    })
-                  }
-                  className="h-9 w-full rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Upload
-                </button>
-              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Select all three documents. They will be uploaded on final submit.
+              </p>
             </div>
 
-            <div className="bg-card border border-border rounded-3xl p-4 flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Resume
-              </p>
-              {profile?.resume_url && (
-                <div className="flex items-center gap-2 text-xs text-green-600">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <a href={profile.resume_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                    View current
-                  </a>
-                </div>
-              )}
-              <FileUpload
-                accept="application/pdf"
-                maxSizeMB={5}
-                label="Upload Resume"
-                hint="PDF only, max 5MB"
-                type="pdf"
-                onFile={setResumeFile}
-                reset={resetResume}
-              />
-              {resumeFile && (
-                <button
-                  onClick={() =>
-                    setConfirm({
-                      message: 'Upload this resume? Your profile will be locked for 15 days.',
-                      action: handleResumeUpload,
-                    })
-                  }
-                  className="h-9 w-full rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Upload
-                </button>
-              )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                  Photo
+                  {profile?.photo_url && <span className="text-green-600 text-xs">✓ uploaded</span>}
+                  {photoFile && <span className="text-blue-600 text-xs">✓ selected</span>}
+                </p>
+                <FileUpload
+                  accept="image/jpeg,image/png"
+                  maxSizeMB={2}
+                  label="Select Photo"
+                  hint="JPG or PNG, max 2MB"
+                  type="image"
+                  onFile={setPhotoFile}
+                  reset={resetPhoto}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                  Resume
+                  {profile?.resume_url && (
+                    <a href={profile.resume_url} target="_blank" rel="noopener noreferrer" className="text-green-600 text-xs hover:underline">✓ view</a>
+                  )}
+                  {resumeFile && <span className="text-blue-600 text-xs">✓ selected</span>}
+                </p>
+                <FileUpload
+                  accept="application/pdf"
+                  maxSizeMB={5}
+                  label="Select Resume"
+                  hint="PDF only, max 5MB"
+                  type="pdf"
+                  onFile={setResumeFile}
+                  reset={resetResume}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                  Documents
+                  {profile?.documents_url && (
+                    <a href={profile.documents_url} target="_blank" rel="noopener noreferrer" className="text-green-600 text-xs hover:underline">✓ view</a>
+                  )}
+                  {documentsFile && <span className="text-blue-600 text-xs">✓ selected</span>}
+                </p>
+                <FileUpload
+                  accept="application/pdf"
+                  maxSizeMB={10}
+                  label="Select Documents"
+                  hint="Consolidated PDF, max 10MB"
+                  type="pdf"
+                  onFile={setDocumentsFile}
+                  reset={resetDocuments}
+                />
+              </div>
             </div>
 
-            <div className="bg-card border border-border rounded-3xl p-4 flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Documents
+            {someFilesSelected && !allFilesSelected && (
+              <p className="text-xs text-center text-muted-foreground">
+                Select all three documents to enable final submit
               </p>
-              {profile?.documents_url && (
-                <div className="flex items-center gap-2 text-xs text-green-600">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <a href={profile.documents_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                    View current
-                  </a>
-                </div>
-              )}
-              <FileUpload
-                accept="application/pdf"
-                maxSizeMB={10}
-                label="Upload Documents"
-                hint="Consolidated PDF (10th, 12th, ID), max 10MB"
-                type="pdf"
-                onFile={setDocumentsFile}
-                reset={resetDocuments}
-              />
-              {documentsFile && (
-                <button
-                  onClick={() =>
-                    setConfirm({
-                      message: 'Upload these documents? Your profile will be locked for 15 days.',
-                      action: handleDocumentsUpload,
-                    })
-                  }
-                  className="h-9 w-full rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Upload
-                </button>
-              )}
-            </div>
+            )}
           </div>
         )}
+
+        {/* Final submit button */}
+        {canEdit && (
+          <button
+            onClick={() => {
+              if (phone && !validatePhone(phone)) return;
+              setConfirm(true);
+            }}
+            disabled={someFilesSelected && !allFilesSelected}
+            className="h-12 w-full rounded-2xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Final Submit
+          </button>
+        )}
+
       </div>
 
       {confirm && (
         <ConfirmDialog
-          message={confirm.message}
-          onConfirm={() => { confirm.action(); setConfirm(null); }}
-          onCancel={() => setConfirm(null)}
+          message="Submitting will lock your profile for 15 days. Any selected documents will be uploaded. This cannot be undone. Continue?"
+          onConfirm={() => { setConfirm(false); handleFinalSubmit(); }}
+          onCancel={() => setConfirm(false)}
         />
       )}
 

@@ -10,6 +10,7 @@ import {
 import { pool } from '../config/database';
 import { v4 as uuidv4 } from 'uuid';
 import { parseImportExcel, importStudents } from '../services/import.service';
+import bcrypt from 'bcryptjs';
 
 export const applyBulkCooldown = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -181,33 +182,47 @@ export const getAllStudents = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const searchStudentByRoll = async (req: AuthRequest, res: Response): Promise<void> => {
+export const searchStudent = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { rollNo } = req.query;
+    const { rollNo, company } = req.query;
 
-    if (!rollNo) {
-      res.status(400).json({ success: false, message: 'rollNo query param is required' });
+    if (!rollNo && !company) {
+      res.status(400).json({ success: false, message: 'rollNo or company query param is required' });
       return;
     }
 
-    const result = await pool.query(
-      `SELECT u.id, u.name, u.email, u.role, u.created_at,
-              sp.roll_number, sp.branch, sp.parent_name, sp.year,
-              sp.phone, sp.permanent_address, sp.photo_url,
-              sp.resume_url, sp.documents_url,
-              sp.placement_status, sp.company_name, sp.job_role, sp.ctc_lakhs
-       FROM users u
-       JOIN student_profiles sp ON sp.user_id = u.id
-       WHERE sp.roll_number ILIKE $1`,
-      [`%${rollNo}%`]
-    );
+    let query = `
+      SELECT u.id, u.name, u.email, u.role, u.created_at,
+             sp.roll_number, sp.branch, sp.parent_name, sp.year,
+             sp.phone, sp.permanent_address, sp.photo_url,
+             sp.resume_url, sp.documents_url,
+             sp.placement_status, sp.company_name, sp.job_role, sp.ctc_lakhs
+      FROM users u
+      JOIN student_profiles sp ON sp.user_id = u.id
+      WHERE u.role = 'student'
+    `;
+    const params: string[] = [];
+
+    if (rollNo) {
+      params.push(`%${rollNo}%`);
+      query += ` AND sp.roll_number ILIKE $${params.length}`;
+    }
+
+    if (company) {
+      params.push(`%${company}%`);
+      query += ` AND sp.company_name ILIKE $${params.length}`;
+    }
+
+    query += ' ORDER BY sp.roll_number ASC';
+
+    const result = await pool.query(query, params);
 
     if (result.rows.length === 0) {
-      res.status(404).json({ success: false, message: 'No student found with that roll number' });
+      res.status(404).json({ success: false, message: 'No students found' });
       return;
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: result.rows });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -281,6 +296,68 @@ export const importStudentsExcel = async (req: AuthRequest, res: Response): Prom
     const result = await importStudents(rows, req.user!.userId);
 
     res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getPasswordResetRequests = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT r.id, r.status, r.requested_at, r.resolved_at,
+              u.id as user_id, u.name, u.email,
+              sp.roll_number, sp.branch
+       FROM password_reset_requests r
+       JOIN users u ON r.user_id = u.id
+       JOIN student_profiles sp ON sp.user_id = u.id
+       ORDER BY r.requested_at DESC`
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const resetStudentPassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    const userResult = await pool.query(
+      `SELECT u.id, sp.roll_number FROM users u
+       JOIN student_profiles sp ON sp.user_id = u.id
+       WHERE u.id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Student not found' });
+      return;
+    }
+
+    const { roll_number } = userResult.rows[0];
+    const defaultPassword = `GCOEA@${roll_number}`;
+    const hashed = await bcrypt.hash(defaultPassword, 12);
+
+    await pool.query(
+      `UPDATE users SET password = $1, is_first_login = true WHERE id = $2`,
+      [hashed, userId]
+    );
+
+    await pool.query(
+      `UPDATE password_reset_requests
+       SET status = 'resolved', resolved_at = NOW()
+       WHERE user_id = $1 AND status = 'pending'`,
+      [userId]
+    );
+
+    await pool.query(
+      `INSERT INTO audit_log (admin_id, action, target_user_id, metadata, ip_address)
+       VALUES ($1, 'PASSWORD_RESET', $2, $3, $4)`,
+      [req.user!.userId, userId, JSON.stringify({ roll_number }), req.ip]
+    );
+
+    res.json({ success: true, message: `Password reset to GCOEA@${roll_number}` });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

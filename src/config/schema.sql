@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'student',
   permission_mask BIGINT NOT NULL DEFAULT 0,
+  is_first_login BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -58,6 +59,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'resolved')),
+  requested_at TIMESTAMP DEFAULT NOW(),
+  resolved_at TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_student_profiles_user ON student_profiles(user_id);
@@ -66,3 +75,5 @@ CREATE INDEX IF NOT EXISTS idx_window_submissions_window ON window_submissions(w
 CREATE INDEX IF NOT EXISTS idx_window_submissions_user ON window_submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_admin ON audit_log(admin_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_requests_user_status
+  ON password_reset_requests(user_id, status);

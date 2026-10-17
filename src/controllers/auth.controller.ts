@@ -73,3 +73,48 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const requestPasswordReset = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { rollNumber } = req.body;
+
+    if (!rollNumber) {
+      res.status(400).json({ success: false, message: 'Roll number is required' });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT u.id FROM users u
+       JOIN student_profiles sp ON sp.user_id = u.id
+       WHERE sp.roll_number = $1 AND u.role = 'student'`,
+      [rollNumber]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'No student found with that roll number' });
+      return;
+    }
+
+    const userId = result.rows[0].id;
+
+    const existing = await pool.query(
+      `SELECT id FROM password_reset_requests
+       WHERE user_id = $1 AND status = 'pending'`,
+      [userId]
+    );
+
+    if (existing.rows.length > 0) {
+      res.json({ success: true, message: 'Reset request already pending. Please wait for admin to resolve it.' });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO password_reset_requests (user_id) VALUES ($1)`,
+      [userId]
+    );
+
+    res.json({ success: true, message: 'Password reset requested. Please contact your administrator.' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

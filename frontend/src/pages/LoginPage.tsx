@@ -13,6 +13,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [rollNumber, setRollNumber] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
   const successMessage = (location.state as { message?: string } | null)?.message;
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,6 +38,19 @@ export default function LoginPage() {
       setError(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    try {
+      const res = await api.post('/auth/request-password-reset', { rollNumber });
+      setForgotMessage(res.data.message);
+    } catch (err: any) {
+      setForgotMessage(err.response?.data?.message || 'Request failed');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -105,24 +122,124 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="text-xs text-muted-foreground hover:text-foreground text-center transition-colors"
+            >
+              Forgot password?
+            </button>
           </form>
         </div>
+
+        {showForgot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-background rounded-3xl border border-border p-6 max-w-sm w-full mx-4 flex flex-col gap-4">
+              <h2 className="font-bold text-foreground">Reset Password</h2>
+              <p className="text-sm text-muted-foreground">
+                Enter your roll number. Your administrator will reset your password and you'll be notified.
+              </p>
+
+              {forgotMessage ? (
+                <>
+                  <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">
+                    {forgotMessage}
+                  </div>
+                  <button
+                    onClick={() => { setShowForgot(false); setForgotMessage(''); setRollNumber(''); }}
+                    className="h-10 w-full rounded-xl bg-primary text-primary-foreground text-sm font-medium"
+                  >
+                    Close
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="flex flex-col gap-3">
+                  <input
+                    value={rollNumber}
+                    onChange={(e) => setRollNumber(e.target.value)}
+                    placeholder="Your roll number (e.g. 23005060)"
+                    required
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                    >
+                      {forgotLoading ? 'Sending...' : 'Request Reset'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowForgot(false); setRollNumber(''); }}
+                      className="h-10 px-4 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Right — branding panel */}
-      <div className="hidden md:flex flex-1 bg-primary flex-col items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,#ffffff08_0px_1px,transparent_1px_10px)]" />
-        <div className="relative z-10 text-center text-primary-foreground max-w-sm">
-          <GraduationCap className="w-12 h-12 mx-auto mb-6 opacity-80" />
-          <h2 className="text-3xl font-bold mb-4 tracking-tight">
-            Campus Information System
-          </h2>
-          <p className="text-primary-foreground/60 text-sm leading-relaxed">
-            High-concurrency student data management with sub-millisecond access control.
-            Built for GECA.
-          </p>
-        </div>
-      </div>
+      {/* Right — animated branding panel */}
+<div className="hidden md:flex flex-1 bg-primary flex-col items-center justify-center p-12 relative overflow-hidden">
+  
+  {/* Animated grid background */}
+  <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:32px_32px]" />
+
+  {/* Glowing orbs */}
+  <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse" />
+  <div className="absolute bottom-1/3 right-1/4 w-48 h-48 bg-white/5 rounded-full blur-2xl animate-pulse [animation-delay:1s]" />
+  <div className="absolute top-1/2 right-1/3 w-32 h-32 bg-white/8 rounded-full blur-xl animate-pulse [animation-delay:2s]" />
+
+  {/* Floating stat cards */}
+  <div className="absolute top-16 right-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 animate-bounce [animation-duration:3s]">
+    <p className="text-white/60 text-xs">Requests/sec</p>
+    <p className="text-white font-bold text-lg">1,350+</p>
+  </div>
+
+  <div className="absolute bottom-24 left-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 animate-bounce [animation-duration:4s] [animation-delay:0.5s]">
+    <p className="text-white/60 text-xs">RBAC Latency</p>
+    <p className="text-white font-bold text-lg">&lt; 1ms</p>
+  </div>
+
+  <div className="absolute top-1/2 right-8 -translate-y-1/2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 animate-bounce [animation-duration:3.5s] [animation-delay:1s]">
+    <p className="text-white/60 text-xs">Concurrent Users</p>
+    <p className="text-white font-bold text-lg">500+</p>
+  </div>
+
+  <div className="absolute top-32 left-8 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 animate-bounce [animation-duration:5s] [animation-delay:1.5s]">
+    <p className="text-white/60 text-xs">Error Rate</p>
+    <p className="text-white font-bold text-lg">0.00%</p>
+  </div>
+
+  {/* Floating permission bits */}
+  <div className="absolute top-20 left-1/2 text-white/20 font-mono text-xs animate-pulse [animation-delay:0.3s]">
+    userMask & routeMask
+  </div>
+  <div className="absolute bottom-40 right-16 text-white/15 font-mono text-xs animate-pulse [animation-delay:1.2s]">
+    O(1) bitwise AND
+  </div>
+  <div className="absolute bottom-16 left-1/3 text-white/15 font-mono text-xs animate-pulse [animation-delay:0.8s]">
+    Redis TTL → 15 days
+  </div>
+
+  {/* Center content */}
+  <div className="relative z-10 text-center text-primary-foreground max-w-xs">
+    <div className="w-16 h-16 rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-6">
+      <GraduationCap className="w-8 h-8 text-white" />
+    </div>
+    <h2 className="text-3xl font-bold mb-3 tracking-tight leading-tight">
+      Built for scale.<br />Designed for GCOEA.
+    </h2>
+    <p className="text-white/50 text-sm leading-relaxed">
+      High-concurrency student information system with sub-millisecond role-based access control.
+    </p>
+  </div>
+</div>
     </div>
   );
 }
