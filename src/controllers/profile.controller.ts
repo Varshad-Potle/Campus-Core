@@ -41,7 +41,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId;
-    const { phone, permanent_address, placement_status, company_name, job_role, ctc_lakhs } = req.body;
+    const { phone, permanent_address, placement_status, company_name, job_role, ctc_lakhs, cgpa } = req.body;
 
     if (placement_status && !['placed', 'unplaced'].includes(placement_status)) {
       res.status(400).json({ success: false, message: 'placement_status must be placed or unplaced' });
@@ -53,6 +53,14 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    if (cgpa !== undefined && cgpa !== null) {
+      const value = parseFloat(cgpa);
+      if (Number.isNaN(value) || value < 0 || value > 10) {
+        res.status(400).json({ success: false, message: 'CGPA must be between 0 and 10' });
+        return;
+      }
+    }
+
     await pool.query(
       `UPDATE student_profiles SET
         phone = COALESCE($1, phone),
@@ -61,9 +69,10 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
         company_name = CASE WHEN $3 = 'unplaced' THEN NULL ELSE COALESCE($4, company_name) END,
         job_role = CASE WHEN $3 = 'unplaced' THEN NULL ELSE COALESCE($5, job_role) END,
         ctc_lakhs = CASE WHEN $3 = 'unplaced' THEN NULL ELSE COALESCE($6, ctc_lakhs) END,
+        cgpa = COALESCE($7, cgpa),
         updated_at = NOW()
-       WHERE user_id = $7`,
-      [phone, permanent_address, placement_status, company_name, job_role, ctc_lakhs, userId]
+       WHERE user_id = $8`,
+      [phone, permanent_address, placement_status, company_name, job_role, ctc_lakhs, cgpa, userId]
     );
 
     await setProfileCooldown(userId);
@@ -164,7 +173,7 @@ export const getCooldownStatus = async (req: AuthRequest, res: Response): Promis
 export const finalSubmit = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId;
-    const { phone, permanent_address, placement_status, company_name, job_role, ctc_lakhs } = req.body;
+    const { phone, permanent_address, placement_status, company_name, job_role, ctc_lakhs, cgpa } = req.body;
 
     if (phone && !/^\d{10}$/.test(phone)) {
       res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits' });
@@ -181,6 +190,14 @@ export const finalSubmit = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
+    if (cgpa !== undefined && cgpa !== null) {
+      const value = parseFloat(cgpa);
+      if (Number.isNaN(value) || value < 0 || value > 10) {
+        res.status(400).json({ success: false, message: 'CGPA must be between 0 and 10' });
+        return;
+      }
+    }
+
     await pool.query(
       `UPDATE student_profiles SET
         phone = COALESCE($1, phone),
@@ -189,9 +206,10 @@ export const finalSubmit = async (req: AuthRequest, res: Response): Promise<void
         company_name = CASE WHEN $3 = 'unplaced' THEN NULL ELSE COALESCE($4, company_name) END,
         job_role = CASE WHEN $3 = 'unplaced' THEN NULL ELSE COALESCE($5, job_role) END,
         ctc_lakhs = CASE WHEN $3 = 'unplaced' THEN NULL ELSE COALESCE($6, ctc_lakhs) END,
+        cgpa = COALESCE($7, cgpa),
         updated_at = NOW()
-       WHERE user_id = $7`,
-      [phone || null, permanent_address || null, placement_status, company_name, job_role, ctc_lakhs, userId]
+       WHERE user_id = $8`,
+      [phone || null, permanent_address || null, placement_status, company_name, job_role, ctc_lakhs, cgpa, userId]
     );
 
     await setProfileCooldown(userId);
@@ -234,6 +252,20 @@ export const updateCgpa = async (req: AuthRequest, res: Response): Promise<void>
       'UPDATE student_profiles SET cgpa = $1, updated_at = NOW() WHERE user_id = $2',
       [value, userId]
     );
+    await setProfileCooldown(userId);
+
+    const windowOpen = await redisClient.get('admin:update-window');
+    if (windowOpen) {
+      const windowId = await redisClient.get('admin:update-window-id');
+      if (windowId) {
+        await pool.query(
+          `INSERT INTO window_submissions (window_id, user_id)
+           VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [windowId, userId]
+        );
+      }
+    }
+
     res.json({ success: true, message: 'CGPA updated successfully' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

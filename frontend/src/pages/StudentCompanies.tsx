@@ -45,7 +45,7 @@ function CompanyCard({
   applying,
 }: {
   company: Company;
-  onApply: (id: number) => void;
+  onApply: (company: Company) => void;
   applying: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -80,7 +80,7 @@ function CompanyCard({
           {statusCfg && <Badge label={statusCfg.label} variant={statusCfg.variant} />}
           {!applied && company.is_eligible && (
             <button
-              onClick={() => onApply(company.id)}
+              onClick={() => onApply(company)}
               disabled={applying || deadlinePassed}
               className="h-8 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -189,6 +189,7 @@ export default function StudentCompanies() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<number | null>(null);
+  const [applicationTarget, setApplicationTarget] = useState<Company | null>(null);
 
   const fetchCompanies = async () => {
     try {
@@ -214,6 +215,12 @@ export default function StudentCompanies() {
     } finally {
       setApplying(null);
     }
+  };
+
+  const confirmApplication = async () => {
+    if (!applicationTarget) return;
+    await handleApply(applicationTarget.id);
+    setApplicationTarget(null);
   };
 
   const eligible   = companies.filter(c => c.is_eligible && !c.application_id);
@@ -247,7 +254,7 @@ export default function StudentCompanies() {
               <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Eligible to Apply
             </p>
             {eligible.map(c => (
-              <CompanyCard key={c.id} company={c} onApply={handleApply} applying={applying === c.id} />
+              <CompanyCard key={c.id} company={c} onApply={setApplicationTarget} applying={applying === c.id} />
             ))}
           </section>
         )}
@@ -259,7 +266,7 @@ export default function StudentCompanies() {
               <Clock className="w-3.5 h-3.5 text-blue-500" /> My Applications
             </p>
             {applied.map(c => (
-              <CompanyCard key={c.id} company={c} onApply={handleApply} applying={applying === c.id} />
+              <CompanyCard key={c.id} company={c} onApply={setApplicationTarget} applying={applying === c.id} />
             ))}
           </section>
         )}
@@ -271,7 +278,7 @@ export default function StudentCompanies() {
               <XCircle className="w-3.5 h-3.5 text-red-400" /> Not Eligible
             </p>
             {ineligible.map(c => (
-              <CompanyCard key={c.id} company={c} onApply={handleApply} applying={applying === c.id} />
+              <CompanyCard key={c.id} company={c} onApply={setApplicationTarget} applying={applying === c.id} />
             ))}
           </section>
         )}
@@ -283,6 +290,36 @@ export default function StudentCompanies() {
         )}
 
       </div>
+
+      {applicationTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background border border-border rounded-3xl max-w-md w-full p-6 flex flex-col gap-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-foreground">
+              Apply to {applicationTarget.name}?
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Your application cannot be withdrawn. Failure to attend this placement drive after applying may lead to debarment from placements.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={confirmApplication}
+                disabled={applying === applicationTarget.id}
+                className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {applying === applicationTarget.id ? 'Applying…' : 'Confirm Apply'}
+              </button>
+              <button
+                onClick={() => setApplicationTarget(null)}
+                disabled={applying === applicationTarget.id}
+                className="flex-1 h-10 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );

@@ -73,6 +73,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [windowOpen, setWindowOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [saveConfirm, setSaveConfirm] = useState(false);
 
   // Form state
   const [phone, setPhone] = useState('');
@@ -82,7 +83,6 @@ export default function StudentDashboard() {
   const [jobRole, setJobRole] = useState('');
   const [ctc, setCtc] = useState('');
   const [cgpa, setCgpa] = useState('');
-  const [cgpaSubmitting, setCgpaSubmitting] = useState(false);
   const [phoneError, setPhoneError] = useState('');
 
   // File state
@@ -133,8 +133,40 @@ export default function StudentDashboard() {
     return true;
   };
 
+  const validateCgpa = () => {
+    if (!cgpa.trim()) return true;
+    const value = parseFloat(cgpa);
+    if (Number.isNaN(value) || value < 0 || value > 10) {
+      addToast('CGPA must be between 0 and 10', 'error');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSaveChanges = async () => {
+    if (phone && !validatePhone(phone)) return;
+    if (!validateCgpa()) return;
+
+    try {
+      await api.patch('/profile/update', {
+        phone: phone || undefined,
+        permanent_address: address || undefined,
+        placement_status: placementStatus,
+        company_name: placementStatus === 'placed' ? company : undefined,
+        job_role: placementStatus === 'placed' ? jobRole : undefined,
+        ctc_lakhs: placementStatus === 'placed' ? parseFloat(ctc) : undefined,
+        cgpa: cgpa ? parseFloat(cgpa) : undefined,
+      });
+      addToast('Changes saved. Profile locked for 15 days.', 'success');
+      await fetchProfile();
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to save changes', 'error');
+    }
+  };
+
   const handleFinalSubmit = async () => {
     if (phone && !validatePhone(phone)) return;
+    if (!validateCgpa()) return;
     try {
       // Step 1: Upload files if selected
       if (photoFile) {
@@ -161,6 +193,7 @@ export default function StudentDashboard() {
         company_name: placementStatus === 'placed' ? company : undefined,
         job_role: placementStatus === 'placed' ? jobRole : undefined,
         ctc_lakhs: placementStatus === 'placed' ? parseFloat(ctc) : undefined,
+        cgpa: cgpa ? parseFloat(cgpa) : undefined,
       });
 
       addToast('Profile submitted successfully. Locked for 15 days.', 'success');
@@ -181,25 +214,6 @@ export default function StudentDashboard() {
       fetchProfile();
     } catch (err: any) {
       addToast(err.response?.data?.message || 'Submission failed', 'error');
-    }
-  };
-
-  const handleCgpaUpdate = async () => {
-    const val = parseFloat(cgpa);
-    if (Number.isNaN(val) || val < 0 || val > 10) {
-      addToast('CGPA must be between 0 and 10', 'error');
-      return;
-    }
-
-    setCgpaSubmitting(true);
-    try {
-      await api.patch('/profile/cgpa', { cgpa: val });
-      addToast('CGPA updated successfully', 'success');
-      fetchProfile();
-    } catch (err: any) {
-      addToast(err.response?.data?.message || 'Failed to update CGPA', 'error');
-    } finally {
-      setCgpaSubmitting(false);
     }
   };
 
@@ -331,7 +345,6 @@ export default function StudentDashboard() {
             />
           </div>
 
-          {/* CGPA — separate submit, uses same cooldown */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               CGPA <span className="text-muted-foreground/60">(0 – 10)</span>
@@ -348,15 +361,20 @@ export default function StudentDashboard() {
                 placeholder="e.g. 8.70"
                 className="h-10 w-40 rounded-xl border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
               />
-              <button
-                onClick={handleCgpaUpdate}
-                disabled={cgpaSubmitting || !cgpa || (profile?.cooldown.blocked && !windowOpen)}
-                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {cgpaSubmitting ? 'Saving…' : 'Update CGPA'}
-              </button>
             </div>
           </div>
+
+          <button
+            onClick={() => {
+              if (phone && !validatePhone(phone)) return;
+              if (!validateCgpa()) return;
+              setSaveConfirm(true);
+            }}
+            disabled={!canEdit}
+            className="h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save Changes
+          </button>
 
           {placementStatus === 'placed' && (
             <div className="grid grid-cols-3 gap-4">
@@ -490,6 +508,14 @@ export default function StudentDashboard() {
           message="Submitting will lock your profile for 15 days. Any selected documents will be uploaded. This cannot be undone. Continue?"
           onConfirm={() => { setConfirm(false); handleFinalSubmit(); }}
           onCancel={() => setConfirm(false)}
+        />
+      )}
+
+      {saveConfirm && (
+        <ConfirmDialog
+          message="Saving changes will lock your entire profile for 15 days. This cannot be undone. Continue?"
+          onConfirm={() => { setSaveConfirm(false); handleSaveChanges(); }}
+          onCancel={() => setSaveConfirm(false)}
         />
       )}
 

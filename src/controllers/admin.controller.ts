@@ -169,6 +169,7 @@ export const getAllStudents = async (req: AuthRequest, res: Response): Promise<v
       `SELECT u.id, u.name, u.email, u.role, u.created_at,
               sp.roll_number, sp.branch, sp.parent_name, sp.year,
               sp.phone, sp.permanent_address,
+              sp.cgpa,
               sp.placement_status, sp.company_name, sp.job_role, sp.ctc_lakhs,
               sp.photo_url, sp.resume_url, sp.documents_url
        FROM users u
@@ -195,6 +196,7 @@ export const searchStudent = async (req: AuthRequest, res: Response): Promise<vo
       SELECT u.id, u.name, u.email, u.role, u.created_at,
              sp.roll_number, sp.branch, sp.parent_name, sp.year,
              sp.phone, sp.permanent_address, sp.photo_url,
+             sp.cgpa,
              sp.resume_url, sp.documents_url,
              sp.placement_status, sp.company_name, sp.job_role, sp.ctc_lakhs
       FROM users u

@@ -25,6 +25,7 @@ interface Student {
   photo_url: string | null;
   phone: string | null;
   permanent_address: string | null;
+  cgpa: string | null;
   parent_name: string | null;
   resume_url: string | null;
   documents_url: string | null;
@@ -339,6 +340,7 @@ export default function AdminStudents() {
                 { label: 'Parent', value: selected.parent_name },
                 { label: 'Phone', value: selected.phone || '—' },
                 { label: 'Address', value: selected.permanent_address || '—' },
+                { label: 'CGPA', value: selected.cgpa || '—' },
               ].map((item) => (
                 <div key={item.label}>
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
