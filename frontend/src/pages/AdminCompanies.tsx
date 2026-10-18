@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/shared/Navbar';
 import { Badge } from '@/components/ui/Badge';
 import { ToastContainer } from '@/components/ui/Toast';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
 import api from '@/lib/api';
 import { Building2, Plus, ChevronDown, ChevronUp, Users } from 'lucide-react';
@@ -207,8 +208,38 @@ export default function AdminCompanies() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-7 w-32" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="bg-card border border-border rounded-3xl p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-2xl" />
+                  <div className="flex flex-col gap-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton className="h-8 w-14" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-5 w-28" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

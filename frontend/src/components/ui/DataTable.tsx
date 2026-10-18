@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface Column<T> {
   key: string;
@@ -43,14 +44,17 @@ export function DataTable<T extends Record<string, any>>({
         </thead>
         <tbody>
           {loading ? (
-            <tr>
-              <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  Loading...
-                </div>
-              </td>
-            </tr>
+            <>
+              {[1, 2, 3, 4, 5].map((row) => (
+                <tr key={row} className="border-b border-border last:border-0">
+                  {columns.map((column) => (
+                    <td key={column.key} className="px-4 py-3">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </>
           ) : data.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">

@@ -4,6 +4,7 @@ import { WindowBanner } from '@/components/student/WindowBanner';
 import { Badge } from '@/components/ui/Badge';
 import { FileUpload } from '@/components/ui/FileUpload';
 import { ToastContainer } from '@/components/ui/Toast';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
 import api from '@/lib/api';
 import { User, Lock } from 'lucide-react';
@@ -219,8 +220,27 @@ export default function StudentDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
+          <Skeleton className="h-20 w-full rounded-3xl" />
+          <div className="bg-card border border-border rounded-3xl p-6 flex items-center gap-4">
+            <Skeleton className="h-16 w-16 rounded-2xl" />
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          </div>
+          <div className="bg-card border border-border rounded-3xl p-6 flex flex-col gap-5">
+            <Skeleton className="h-4 w-40" />
+            <div className="grid grid-cols-2 gap-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
       </div>
     );
   }
