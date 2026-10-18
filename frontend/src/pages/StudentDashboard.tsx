@@ -25,6 +25,9 @@ interface Profile {
   company_name: string | null;
   job_role: string | null;
   ctc_lakhs: string | null;
+  ssc_percentage: string | null;
+  hsc_diploma_percentage: string | null;
+  cgpa: string | null;
   cooldown: {
     blocked: boolean;
     remainingDays?: number;
@@ -70,7 +73,6 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [windowOpen, setWindowOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   // Form state
   const [phone, setPhone] = useState('');
@@ -79,6 +81,8 @@ export default function StudentDashboard() {
   const [company, setCompany] = useState('');
   const [jobRole, setJobRole] = useState('');
   const [ctc, setCtc] = useState('');
+  const [cgpa, setCgpa] = useState('');
+  const [cgpaSubmitting, setCgpaSubmitting] = useState(false);
   const [phoneError, setPhoneError] = useState('');
 
   // File state
@@ -108,6 +112,7 @@ export default function StudentDashboard() {
       setCompany(p.company_name || '');
       setJobRole(p.job_role || '');
       setCtc(p.ctc_lakhs || '');
+      setCgpa(p.cgpa || '');
     } catch {
       addToast('Failed to load profile', 'error');
     } finally {
@@ -130,7 +135,6 @@ export default function StudentDashboard() {
 
   const handleFinalSubmit = async () => {
     if (phone && !validatePhone(phone)) return;
-    setSubmitting(true);
     try {
       // Step 1: Upload files if selected
       if (photoFile) {
@@ -177,8 +181,25 @@ export default function StudentDashboard() {
       fetchProfile();
     } catch (err: any) {
       addToast(err.response?.data?.message || 'Submission failed', 'error');
+    }
+  };
+
+  const handleCgpaUpdate = async () => {
+    const val = parseFloat(cgpa);
+    if (Number.isNaN(val) || val < 0 || val > 10) {
+      addToast('CGPA must be between 0 and 10', 'error');
+      return;
+    }
+
+    setCgpaSubmitting(true);
+    try {
+      await api.patch('/profile/cgpa', { cgpa: val });
+      addToast('CGPA updated successfully', 'success');
+      fetchProfile();
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to update CGPA', 'error');
     } finally {
-      setSubmitting(false);
+      setCgpaSubmitting(false);
     }
   };
 
@@ -248,6 +269,8 @@ export default function StudentDashboard() {
               { label: 'Branch', value: profile?.branch },
               { label: 'Parent Name', value: profile?.parent_name },
               { label: 'Year', value: profile?.year },
+              { label: 'SSC %', value: profile?.ssc_percentage ? `${profile.ssc_percentage}%` : '—' },
+              { label: 'HSC / Diploma %', value: profile?.hsc_diploma_percentage ? `${profile.hsc_diploma_percentage}%` : '—' },
             ].map((item) => (
               <div key={item.label}>
                 <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -306,6 +329,33 @@ export default function StudentDashboard() {
               rows={2}
               className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50 disabled:cursor-not-allowed"
             />
+          </div>
+
+          {/* CGPA — separate submit, uses same cooldown */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              CGPA <span className="text-muted-foreground/60">(0 – 10)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="10"
+                value={cgpa}
+                onChange={(e) => setCgpa(e.target.value)}
+                disabled={profile?.cooldown.blocked && !windowOpen}
+                placeholder="e.g. 8.70"
+                className="h-10 w-40 rounded-xl border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={handleCgpaUpdate}
+                disabled={cgpaSubmitting || !cgpa || (profile?.cooldown.blocked && !windowOpen)}
+                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {cgpaSubmitting ? 'Saving…' : 'Update CGPA'}
+              </button>
+            </div>
           </div>
 
           {placementStatus === 'placed' && (

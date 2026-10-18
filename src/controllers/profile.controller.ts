@@ -11,6 +11,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.role,
               sp.roll_number, sp.branch, sp.parent_name, sp.year,
+              sp.ssc_percentage, sp.hsc_diploma_percentage, sp.cgpa,
               sp.phone, sp.permanent_address, sp.photo_url,
               sp.resume_url, sp.documents_url,
               sp.placement_status, sp.company_name, sp.job_role, sp.ctc_lakhs,
@@ -208,6 +209,32 @@ export const finalSubmit = async (req: AuthRequest, res: Response): Promise<void
     }
 
     res.json({ success: true, message: 'Profile submitted. Locked for 15 days.' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const updateCgpa = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  const { cgpa } = req.body;
+
+  if (cgpa === undefined || cgpa === null) {
+    res.status(400).json({ success: false, message: 'cgpa is required' });
+    return;
+  }
+
+  const value = parseFloat(cgpa);
+  if (Number.isNaN(value) || value < 0 || value > 10) {
+    res.status(400).json({ success: false, message: 'CGPA must be between 0 and 10' });
+    return;
+  }
+
+  try {
+    await pool.query(
+      'UPDATE student_profiles SET cgpa = $1, updated_at = NOW() WHERE user_id = $2',
+      [value, userId]
+    );
+    res.json({ success: true, message: 'CGPA updated successfully' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

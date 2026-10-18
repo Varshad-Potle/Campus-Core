@@ -4,7 +4,9 @@ import LoginPage from '@/pages/LoginPage';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminStudents from '@/pages/AdminStudents';
 import AdminAuditLog from '@/pages/AdminAuditLog';
+import AdminCompanies from '@/pages/AdminCompanies';
 import StudentDashboard from '@/pages/StudentDashboard';
+import StudentCompanies from '@/pages/StudentCompanies';
 import ChangePasswordPage from '@/pages/ChangePasswordPage';
 
 export default function App() {
@@ -38,12 +40,28 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/companies"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminCompanies />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/student"
           element={
             <ProtectedRoute role="student">
               <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/companies"
+          element={
+            <ProtectedRoute role="student">
+              <StudentCompanies />
             </ProtectedRoute>
           }
         />

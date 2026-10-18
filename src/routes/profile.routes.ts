@@ -11,6 +11,7 @@ import {
   uploadDocuments,
   getCooldownStatus,
   finalSubmit,
+  updateCgpa,
 } from '../controllers/profile.controller';
 
 const router = Router();
@@ -34,6 +35,14 @@ router.patch(
   requirePermission(Permissions.UPDATE_PROFILE),
   checkCooldown,
   updateProfile
+);
+
+router.patch(
+  '/cgpa',
+  authenticate,
+  requirePermission(Permissions.READ_PROFILE),
+  checkCooldown,
+  updateCgpa
 );
 
 router.post(

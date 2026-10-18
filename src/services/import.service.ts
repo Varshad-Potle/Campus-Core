@@ -9,6 +9,8 @@ export interface ImportRow {
   roll_number: string;
   branch: string;
   parent_name: string;
+  ssc_percentage?: number;
+  hsc_diploma_percentage?: number;
 }
 
 export const parseImportExcel = async (buffer: Buffer): Promise<ImportRow[]> => {
@@ -36,13 +38,23 @@ export const parseImportExcel = async (buffer: Buffer): Promise<ImportRow[]> => 
       rowData[header] = values[index + 1]?.toString().trim() || '';
     });
 
-    if (rowData.name && rowData.email && rowData.roll_number && rowData.branch && rowData.parent_name) {
+    if (
+      rowData['name'] &&
+      rowData['email'] &&
+      rowData['roll number'] &&
+      rowData['branch'] &&
+      rowData['parent name']
+    ) {
       rows.push({
-        name: rowData.name,
-        email: rowData.email,
-        roll_number: rowData.roll_number,
-        branch: rowData.branch,
-        parent_name: rowData.parent_name,
+        name: rowData['name'],
+        email: rowData['email'],
+        roll_number: rowData['roll number'],
+        branch: rowData['branch'],
+        parent_name: rowData['parent name'],
+        ssc_percentage: rowData['ssc %'] ? parseFloat(rowData['ssc %']) : undefined,
+        hsc_diploma_percentage: rowData['hsc/diploma %']
+          ? parseFloat(rowData['hsc/diploma %'])
+          : undefined,
       });
     }
   });
@@ -67,8 +79,16 @@ export const importStudents = async (
         'SELECT id FROM users WHERE email = $1', [row.email]
       );
       if (existing.rows.length > 0) {
-        skipped++;
-        await client.query('ROLLBACK');
+        await client.query(
+          `UPDATE student_profiles
+           SET ssc_percentage = $1,
+               hsc_diploma_percentage = $2,
+               updated_at = NOW()
+           WHERE user_id = $3`,
+          [row.ssc_percentage ?? null, row.hsc_diploma_percentage ?? null, existing.rows[0].id]
+        );
+        imported++;
+        await client.query('COMMIT');
         continue;
       }
 
@@ -94,9 +114,22 @@ export const importStudents = async (
       const userId = userResult.rows[0].id;
 
       await client.query(
-        `INSERT INTO student_profiles (user_id, roll_number, branch, parent_name, year)
-         VALUES ($1, $2, $3, $4, 4)`,
-        [userId, row.roll_number, row.branch, row.parent_name]
+        `INSERT INTO student_profiles
+           (user_id, roll_number, branch, parent_name, year,
+            ssc_percentage, hsc_diploma_percentage)
+         VALUES ($1, $2, $3, $4, 4, $5, $6)
+         ON CONFLICT (user_id) DO UPDATE SET
+           ssc_percentage = EXCLUDED.ssc_percentage,
+           hsc_diploma_percentage = EXCLUDED.hsc_diploma_percentage,
+           updated_at = NOW()`,
+        [
+          userId,
+          row.roll_number,
+          row.branch,
+          row.parent_name,
+          row.ssc_percentage ?? null,
+          row.hsc_diploma_percentage ?? null,
+        ]
       );
 
       await client.query(

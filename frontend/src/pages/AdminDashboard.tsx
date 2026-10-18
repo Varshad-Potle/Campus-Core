@@ -13,6 +13,60 @@ interface Stats {
   windows: { id: string; submissions: string; opened_at: string; closed_at: string | null }[];
 }
 
+function WindowHistory({ windows }: { windows: Stats['windows'] }) {
+  const PAGE_SIZE = 3;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(windows.length / PAGE_SIZE);
+  const slice = windows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  return (
+    <div className="bg-card border border-border rounded-3xl p-6">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Recent Windows
+        </p>
+        <span className="text-xs text-muted-foreground">{windows.length} total</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {slice.map((w) => (
+          <div key={w.id} className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              {new Date(w.opened_at).toLocaleDateString('en-IN')}
+            </span>
+            <span className="font-medium text-foreground">{w.submissions} submissions</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              w.closed_at ? 'bg-muted text-muted-foreground' : 'bg-green-100 text-green-800'
+            }`}>
+              {w.closed_at ? 'Closed' : 'Active'}
+            </span>
+          </div>
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+          >
+            ← Prev
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1}
+            className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { toasts, addToast, removeToast } = useToast();
@@ -94,32 +148,8 @@ export default function AdminDashboard() {
               </div>
             </button>
 
-            {/* Window history */}
             {stats?.windows && stats.windows.length > 0 && (
-              <div className="bg-card border border-border rounded-3xl p-6">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  Recent Windows
-                </p>
-                <div className="flex flex-col gap-2">
-                  {stats.windows.slice(0, 3).map((w) => (
-                    <div key={w.id} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {new Date(w.opened_at).toLocaleDateString('en-IN')}
-                      </span>
-                      <span className="font-medium text-foreground">
-                        {w.submissions} submissions
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        w.closed_at
-                          ? 'bg-muted text-muted-foreground'
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {w.closed_at ? 'Closed' : 'Active'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <WindowHistory windows={stats.windows} />
             )}
           </div>
         </div>
