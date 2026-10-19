@@ -7,6 +7,7 @@ import {
   updateCompany,
   adminListCompanies,
   getCompanyApplicants,
+  exportCompanyApplicants,
   updateApplicationStatus,
   studentListCompanies,
   applyToCompany,
@@ -40,6 +41,9 @@ router.patch('/admin/:id', requirePermission(Permissions.ADMIN), updateCompany);
 
 // Get all applicants for a specific company
 router.get('/admin/:id/applicants', requirePermission(Permissions.ADMIN), getCompanyApplicants);
+
+// Export applicants for a specific company
+router.get('/admin/:id/applicants/export', requirePermission(Permissions.ADMIN), exportCompanyApplicants);
 
 // Update an application's status (applied → shortlisted → interview → selected/rejected)
 router.patch(

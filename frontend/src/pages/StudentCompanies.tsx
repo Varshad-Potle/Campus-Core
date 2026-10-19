@@ -30,6 +30,7 @@ interface Company {
   application_id: number | null;
   application_status: string | null;
   applied_at: string | null;
+  total_applicants: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'success' | 'warning' | 'neutral' | 'danger' }> = {
@@ -115,6 +116,12 @@ function CompanyCard({
               ? 'Deadline passed'
               : `Deadline: ${new Date(company.application_deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${new Date(company.application_deadline).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`}
             variant={deadlinePassed ? 'danger' : 'warning'}
+          />
+        )}
+        {parseInt(company.total_applicants) > 0 && (
+          <Badge
+            label={`${company.total_applicants} applied`}
+            variant="neutral"
           />
         )}
       </div>

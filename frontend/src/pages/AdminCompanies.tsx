@@ -5,7 +5,7 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
 import api from '@/lib/api';
-import { Building2, Plus, ChevronDown, ChevronUp, Users } from 'lucide-react';
+import { Building2, Plus, ChevronDown, ChevronUp, Users, Download } from 'lucide-react';
 
 interface Company {
   id: number;
@@ -75,6 +75,7 @@ export default function AdminCompanies() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [applicantsLoading, setApplicantsLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Expanded company details
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -201,6 +202,27 @@ export default function AdminCompanies() {
       addToast(err.response?.data?.message || 'Update failed', 'error');
     } finally {
       setUpdatingStatus(null);
+    }
+  };
+
+  const exportApplicants = async (company: Company) => {
+    setExporting(true);
+    try {
+      const res = await api.get(`/companies/admin/${company.id}/applicants/export`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${company.name.replace(/[^a-zA-Z0-9]/g, '_')}_applicants.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      addToast('Export failed', 'error');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -496,8 +518,19 @@ export default function AdminCompanies() {
           <div className="bg-background border border-border rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-foreground">{drawerCompany.name} — Applicants</h2>
-              <button onClick={() => setDrawerCompany(null)}
-                className="text-muted-foreground hover:text-foreground text-sm">Close</button>
+              <div className="flex items-center gap-2">
+                {applicants.length > 0 && (
+                  <button
+                    onClick={() => exportApplicants(drawerCompany)}
+                    disabled={exporting}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5" /> {exporting ? 'Exporting…' : 'Export Excel'}
+                  </button>
+                )}
+                <button onClick={() => setDrawerCompany(null)}
+                  className="text-muted-foreground hover:text-foreground text-sm">Close</button>
+              </div>
             </div>
 
             {applicantsLoading ? (

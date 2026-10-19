@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import ExcelJS from 'exceljs';
 import { pool } from '../config/database';
 
 // ─── Admin: Create company ────────────────────────────────────────────────────
@@ -171,6 +172,65 @@ export const getCompanyApplicants = async (req: Request, res: Response) => {
   }
 };
 
+// ─── Admin: Export applicants as Excel ───────────────────────────────────────
+export const exportCompanyApplicants = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const companyRes = await pool.query('SELECT name FROM companies WHERE id = $1', [id]);
+    if (companyRes.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    const companyName = companyRes.rows[0].name;
+
+    const result = await pool.query(
+      `SELECT
+        u.name, u.email,
+        sp.roll_number, sp.branch, sp.year, sp.phone,
+        sp.ssc_percentage, sp.hsc_diploma_percentage, sp.cgpa,
+        a.status, a.applied_at
+       FROM applications a
+       JOIN users u ON u.id = a.student_id
+       JOIN student_profiles sp ON sp.user_id = a.student_id
+       WHERE a.company_id = $1
+       ORDER BY a.applied_at DESC`,
+      [id]
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Applicants');
+
+    sheet.columns = [
+      { header: 'Name',          key: 'name',                   width: 24 },
+      { header: 'Email',         key: 'email',                  width: 28 },
+      { header: 'Roll Number',   key: 'roll_number',            width: 14 },
+      { header: 'Branch',        key: 'branch',                 width: 10 },
+      { header: 'Year',          key: 'year',                   width: 6  },
+      { header: 'Phone',         key: 'phone',                  width: 14 },
+      { header: 'SSC %',         key: 'ssc_percentage',         width: 10 },
+      { header: 'HSC/Diploma %', key: 'hsc_diploma_percentage', width: 14 },
+      { header: 'CGPA',          key: 'cgpa',                   width: 8  },
+      { header: 'Status',        key: 'status',                 width: 14 },
+      { header: 'Applied At',    key: 'applied_at',             width: 20 },
+    ];
+
+    sheet.getRow(1).font = { bold: true };
+
+    result.rows.forEach(row => {
+      sheet.addRow({
+        ...row,
+        applied_at: new Date(row.applied_at).toLocaleString('en-IN'),
+      });
+    });
+
+    const safeName = companyName.replace(/[^a-zA-Z0-9]/g, '_');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_applicants.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // ─── Admin: Update application status ────────────────────────────────────────
 export const updateApplicationStatus = async (req: Request, res: Response) => {
   const { applicationId } = req.params;
@@ -223,7 +283,8 @@ export const studentListCompanies = async (req: Request, res: Response) => {
         END AS ineligibility_reason,
         a.id     AS application_id,
         a.status AS application_status,
-        a.applied_at
+        a.applied_at,
+        (SELECT COUNT(*) FROM applications WHERE company_id = c.id) AS total_applicants
        FROM companies c
        CROSS JOIN student_profiles sp
        LEFT JOIN applications a ON a.company_id = c.id AND a.student_id = $1
