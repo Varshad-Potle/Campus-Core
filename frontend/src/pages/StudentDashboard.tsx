@@ -384,18 +384,6 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              if (phone && !validatePhone(phone)) return;
-              if (!validateCgpa()) return;
-              setSaveConfirm(true);
-            }}
-            disabled={!canEdit}
-            className="h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Save Changes
-          </button>
-
           {placementStatus === 'placed' && (
             <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5">
@@ -428,6 +416,18 @@ export default function StudentDashboard() {
               </div>
             </div>
           )}
+
+          <button
+            onClick={() => {
+              if (phone && !validatePhone(phone)) return;
+              if (!validateCgpa()) return;
+              setSaveConfirm(true);
+            }}
+            disabled={!canEdit}
+            className="h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save Changes
+          </button>
         </div>
 
         {/* Document uploads */}

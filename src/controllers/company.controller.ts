@@ -264,12 +264,27 @@ export const studentListCompanies = async (req: Request, res: Response) => {
         c.*,
         COALESCE(
           (
+            (
+              sp.placement_status IS DISTINCT FROM 'placed' OR
+              (
+                sp.ctc_lakhs IS NOT NULL AND
+                c.ctc_lakhs IS NOT NULL AND
+                c.ctc_lakhs >= sp.ctc_lakhs * 2
+              )
+            ) AND
             (c.min_ssc_percentage IS NULL OR sp.ssc_percentage >= c.min_ssc_percentage) AND
             (c.min_hsc_percentage  IS NULL OR sp.hsc_diploma_percentage >= c.min_hsc_percentage) AND
             (c.min_cgpa            IS NULL OR sp.cgpa >= c.min_cgpa)
           ), false
         ) AS is_eligible,
         CASE
+          WHEN sp.placement_status = 'placed'
+            AND (
+              sp.ctc_lakhs IS NULL
+              OR c.ctc_lakhs IS NULL
+              OR c.ctc_lakhs < sp.ctc_lakhs * 2
+            )
+            THEN 'CTC ' || COALESCE(sp.ctc_lakhs * 2, 0) || 'L or higher required for placed students'
           WHEN c.min_ssc_percentage IS NOT NULL
             AND (sp.ssc_percentage IS NULL OR sp.ssc_percentage < c.min_ssc_percentage)
             THEN 'SSC ' || c.min_ssc_percentage || '% required'
@@ -325,14 +340,24 @@ export const applyToCompany = async (req: Request, res: Response) => {
     if (profileRes.rows.length === 0)
       return res.status(400).json({ success: false, message: 'Profile not found' });
     const sp = profileRes.rows[0];
+    const currentCTC = parseFloat(sp.ctc_lakhs);
 
     const eligible =
+      (sp.placement_status !== 'placed' ||
+        (sp.ctc_lakhs !== null &&
+          company.ctc_lakhs !== null &&
+          parseFloat(company.ctc_lakhs) >= parseFloat(sp.ctc_lakhs) * 2)) &&
       (company.min_ssc_percentage === null || (sp.ssc_percentage !== null && parseFloat(sp.ssc_percentage) >= parseFloat(company.min_ssc_percentage))) &&
       (company.min_hsc_percentage === null || (sp.hsc_diploma_percentage !== null && parseFloat(sp.hsc_diploma_percentage) >= parseFloat(company.min_hsc_percentage))) &&
       (company.min_cgpa === null || (sp.cgpa !== null && parseFloat(sp.cgpa) >= parseFloat(company.min_cgpa)));
 
     if (!eligible)
-      return res.status(403).json({ success: false, message: 'You do not meet the eligibility criteria for this company' });
+      return res.status(403).json({
+        success: false,
+        message: sp.placement_status === 'placed' && Number.isFinite(currentCTC)
+          ? `Placed students require a company offering at least ₹${(currentCTC * 2).toFixed(2)}L CTC`
+          : 'You do not meet the eligibility criteria for this company',
+      });
 
     // 3. Already applied?
     const existingApp = await pool.query(
