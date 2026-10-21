@@ -53,6 +53,11 @@ Any profile update locks the entire profile for 15 days via a Redis key with TTL
 ### Global Update Window
 Admins can open a campus-wide update window with a custom message and field list. Bypasses all cooldowns instantly via Redis Pub/Sub broadcast.
 
+### Placement Applications
+Admins can publish company drives with eligibility criteria, compensation, internship details, deadlines, and service-bond information. Students can browse active companies, see eligibility explanations, apply once per company, and track application status.
+
+Placed students can apply to another company only when its CTC is at least **2x their current CTC**. This rule is enforced both when companies are listed and when an application is submitted, so it cannot be bypassed by calling the API directly.
+
 ---
 
 ## Tech Stack
@@ -90,14 +95,19 @@ Tested on WSL2 development environment (single instance, no load balancer).
 ### Student
 - View full profile with fixed and updatable fields
 - Update phone, address, placement status, company, CTC
+- Maintain SSC, HSC/Diploma, and CGPA details used for company eligibility
 - Upload photo (JPG/PNG, 2MB), resume (PDF, 5MB), consolidated documents (PDF, 10MB)
 - Profile locks for 15 days after any submission
 - See active update window with message and fields to update
+- Browse placement companies, review eligibility requirements, apply to drives, and track application history
+- Placed-student applications require an offer worth at least 2x the current CTC
 - Request password reset from admin
 
 ### Admin
 - Import students via Excel (bulk creation with default passwords)
 - Open/close update windows with custom message and field list
+- Create and update company drives with eligibility, CTC, internship, deadline, and service-bond details
+- View company applicant counts, export applicant lists, and update application statuses
 - Search students by roll number or company name
 - View full student profiles including documents
 - Bulk apply/clear cooldowns
@@ -184,6 +194,8 @@ psql -U campuscore -d campuscore -h localhost -W -f src/config/schema.sql
 ### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | /health | Health check |
+| POST | /api/auth/register | Register a user |
 | POST | /api/auth/login | Login |
 | POST | /api/auth/change-password | Change password |
 | POST | /api/auth/request-password-reset | Request reset |
@@ -193,6 +205,8 @@ psql -U campuscore -d campuscore -h localhost -W -f src/config/schema.sql
 |--------|----------|-------------|
 | GET | /api/profile/me | Get own profile |
 | GET | /api/profile/cooldown | Get cooldown status |
+| PATCH | /api/profile/update | Update profile fields |
+| PATCH | /api/profile/cgpa | Update CGPA |
 | POST | /api/profile/submit | Final submit (applies cooldown) |
 | POST | /api/profile/photo/temp | Upload photo |
 | POST | /api/profile/resume/temp | Upload resume |
@@ -208,6 +222,7 @@ psql -U campuscore -d campuscore -h localhost -W -f src/config/schema.sql
 | POST | /api/admin/students/profile | Create student profile |
 | POST | /api/admin/window/open | Open update window |
 | DELETE | /api/admin/window/close | Close update window |
+| GET | /api/admin/window/status | Get window status (admin) |
 | GET | /api/admin/window/active | Get active window |
 | GET | /api/admin/audit-log | Paginated audit log |
 | POST | /api/admin/cooldown/apply | Bulk apply cooldown |
@@ -215,3 +230,18 @@ psql -U campuscore -d campuscore -h localhost -W -f src/config/schema.sql
 | POST | /api/admin/permissions | Update permissions |
 | GET | /api/admin/password-reset-requests | Pending resets |
 | POST | /api/admin/students/:userId/reset-password | Reset password |
+
+### Placement Companies
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/companies | List active companies with student eligibility |
+| POST | /api/companies/:companyId/apply | Apply to a company |
+| GET | /api/companies/my-applications | View own applications |
+| GET | /api/companies/admin/all | List companies with applicant counts |
+| POST | /api/companies/admin | Create a company drive |
+| PATCH | /api/companies/admin/:id | Update a company drive |
+| GET | /api/companies/admin/:id/applicants | List company applicants |
+| GET | /api/companies/admin/:id/applicants/export | Export applicants as Excel |
+| PATCH | /api/companies/admin/applications/:applicationId/status | Update application status |
+
+Application statuses progress through `applied`, `shortlisted`, `interview`, `selected`, or `rejected`. Each student can have at most one application per company.
