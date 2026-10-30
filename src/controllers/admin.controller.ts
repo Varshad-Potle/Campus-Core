@@ -235,7 +235,13 @@ export const getStats = async (req: AuthRequest, res: Response): Promise<void> =
     const [studentsResult, windowsResult] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM users WHERE role = 'student'`),
       pool.query(`
-        SELECT uw.id, uw.message, uw.opened_at, uw.closed_at,
+        SELECT uw.id, uw.message, uw.opened_at,
+               CASE
+                 WHEN uw.closed_at IS NOT NULL THEN uw.closed_at
+                 WHEN uw.opened_at + (uw.duration_seconds * INTERVAL '1 second') <= NOW()
+                   THEN uw.opened_at + (uw.duration_seconds * INTERVAL '1 second')
+                 ELSE NULL
+               END AS closed_at,
                COUNT(ws.id) as submissions
         FROM update_windows uw
         LEFT JOIN window_submissions ws ON ws.window_id = uw.id

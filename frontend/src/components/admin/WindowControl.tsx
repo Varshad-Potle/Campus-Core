@@ -55,9 +55,18 @@ export function WindowControl({ onSuccess, addToast }: WindowControlProps) {
   useEffect(() => {
     if (!activeWindow?.open || !activeWindow.ttl) return;
     setTimeLeft(activeWindow.ttl);
-    const id = setInterval(() => setTimeLeft((t) => Math.max(0, t - 1)), 1000);
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          void fetchStatus().then(onSuccess);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
     return () => clearInterval(id);
-  }, [activeWindow]);
+  }, [activeWindow, onSuccess]);
 
   const toggleField = (f: string) =>
     setFields((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
